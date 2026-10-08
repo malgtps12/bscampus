@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, name, student_id, email, phone, campus, created_at')
+      .select('id, name, student_id, email, phone, campus, bank_name, account_number, account_holder_name, ewallet_type, ewallet_number, created_at')
       .eq('student_id', decoded.username)
       .single()
 
@@ -36,6 +36,11 @@ export async function GET(request: NextRequest) {
         email: user.email,
         phone: user.phone,
         campus: user.campus,
+        bankName: user.bank_name,
+        accountNumber: user.account_number,
+        accountHolderName: user.account_holder_name,
+        ewalletType: user.ewallet_type,
+        ewalletNumber: user.ewallet_number,
         createdAt: user.created_at
       }
     })

@@ -10,6 +10,11 @@ CREATE TABLE IF NOT EXISTS users (
   phone VARCHAR(20) NOT NULL,
   campus VARCHAR(100) NOT NULL,
   password_hash TEXT NOT NULL,
+  bank_name VARCHAR(50),
+  account_number VARCHAR(50),
+  account_holder_name VARCHAR(100),
+  ewallet_type VARCHAR(20),
+  ewallet_number VARCHAR(50),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -123,5 +128,11 @@ $$ language 'plpgsql';
 -- Create trigger for auto-updating updated_at
 CREATE TRIGGER update_products_updated_at
     BEFORE UPDATE ON products
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Create trigger for users updated_at
+CREATE TRIGGER update_users_updated_at
+    BEFORE UPDATE ON users
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();

@@ -21,4 +21,9 @@ export interface User {
   email: string;
   phone: string;
   campus: string;
+  bankName?: string;
+  accountNumber?: string;
+  accountHolderName?: string;
+  ewalletType?: string;
+  ewalletNumber?: string;
 }
