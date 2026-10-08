@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ShoppingCart, Plus, Search } from "lucide-react";
+import { ShoppingCart, Plus, Search, MessageCircle } from "lucide-react";
 import { AuthHeader } from "./AuthHeader";
 
 export function Header() {
@@ -32,6 +32,12 @@ export function Header() {
             >
               <Plus className="h-4 w-4" />
               Jual
+            </Link>
+            <Link
+              href="/chat"
+              className="h-10 w-10 rounded-lg border border-slate-300 flex items-center justify-center hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-900"
+            >
+              <MessageCircle className="h-5 w-5" />
             </Link>
             <button className="h-10 w-10 rounded-lg border border-slate-300 flex items-center justify-center hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-900">
               <ShoppingCart className="h-5 w-5" />

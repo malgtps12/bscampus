@@ -11,16 +11,73 @@ import {
   Phone,
   Calendar,
   CheckCircle,
+  MessageCircle,
 } from "lucide-react";
 
 export default function ProductDetailPage() {
   const params = useParams();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [creatingChat, setCreatingChat] = useState(false);
 
   useEffect(() => {
     fetchProduct();
+    checkAuth();
   }, [params.id]);
+
+  const checkAuth = async () => {
+    try {
+      const response = await fetch("/api/auth/me");
+      const data = await response.json();
+      if (response.ok && data.user) {
+        setUser(data.user);
+      }
+    } catch (error) {
+      console.error("Auth check error:", error);
+    }
+  };
+
+  const handleChatPenjual = async () => {
+    if (!user) {
+      window.location.href = "/login?redirect=/products/" + params.id;
+      return;
+    }
+
+    if (!product) return;
+
+    setCreatingChat(true);
+    try {
+      const { data: seller } = await (await fetch(`/api/users/by-student-id/${product.seller_student_id}`)).json();
+      
+      if (!seller) {
+        alert("Penjual tidak ditemukan");
+        return;
+      }
+
+      const response = await fetch("/api/chat/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: product.id,
+          sellerId: seller.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        window.location.href = `/chat/${data.id}`;
+      } else {
+        alert(data.error || "Gagal membuat percakapan");
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Terjadi kesalahan");
+    } finally {
+      setCreatingChat(false);
+    }
+  };
 
   const fetchProduct = async () => {
     try {
@@ -171,18 +228,23 @@ export default function ProductDetailPage() {
                     </p>
                     <p className="font-semibold">{product.seller_student_id}</p>
                   </div>
-                  <div className="pt-4 space-y-3 border-t border-slate-200 dark:border-slate-700">
-                    <a
-                      href={`tel:${product.seller_contact}`}
-                      className="flex items-center gap-3 rounded-lg bg-white p-3 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors"
-                    >
-                      <Phone className="h-5 w-5 text-blue-500" />
-                      <span>{product.seller_contact}</span>
-                    </a>
-                    <button className="w-full flex items-center justify-center gap-2 h-12 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold hover:shadow-lg transition-shadow">
-                      Hubungi Penjual
-                    </button>
-                  </div>
+                   <div className="pt-4 space-y-3 border-t border-slate-200 dark:border-slate-700">
+                     <a
+                       href={`tel:${product.seller_contact}`}
+                       className="flex items-center gap-3 rounded-lg bg-white p-3 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors"
+                     >
+                       <Phone className="h-5 w-5 text-blue-500" />
+                       <span>{product.seller_contact}</span>
+                     </a>
+                     <button 
+                       onClick={handleChatPenjual}
+                       disabled={creatingChat}
+                       className="w-full flex items-center justify-center gap-2 h-12 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold hover:shadow-lg transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                     >
+                       <MessageCircle className="h-5 w-5" />
+                       {creatingChat ? "Memproses..." : "Chat dengan Penjual"}
+                     </button>
+                   </div>
                 </div>
               </div>
 
