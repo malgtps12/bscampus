@@ -1,6 +1,23 @@
 -- BSCampus Database Schema
 -- Tables for products, users, and categories
 
+-- Users table
+CREATE TABLE IF NOT EXISTS users (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  student_id VARCHAR(20) UNIQUE NOT NULL,
+  email VARCHAR(100) UNIQUE NOT NULL,
+  phone VARCHAR(20) NOT NULL,
+  campus VARCHAR(100) NOT NULL,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create indexes for users
+CREATE INDEX IF NOT EXISTS idx_users_student_id ON users(student_id);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
 -- Products table
 CREATE TABLE IF NOT EXISTS products (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
