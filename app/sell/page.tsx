@@ -12,6 +12,10 @@ export default function SellPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [submitted, setSubmitted] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -65,11 +69,6 @@ export default function SellPage() {
   if (!user) {
     return null;
   }
-
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-  const [submitted, setSubmitted] = useState(false);
-  const [uploading, setUploading] = useState(false);
 
   const handleChange = (
     e: React.ChangeEvent<
