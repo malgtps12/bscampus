@@ -144,12 +144,6 @@ export function AuthHeader() {
   return (
     <div className="flex items-center gap-2">
       <Link
-        href="/admin/login"
-        className="hidden sm:block h-10 px-3 rounded-lg text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 text-xs font-medium"
-      >
-        Admin
-      </Link>
-      <Link
         href="/login"
         className="h-10 px-4 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900 text-sm font-medium"
       >
