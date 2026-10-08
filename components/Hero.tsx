@@ -21,14 +21,14 @@ export function Hero() {
                 href="/products"
                 className="inline-flex h-12 items-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-8 text-white font-semibold hover:shadow-lg transition-all hover:scale-105"
               >
-                Jelajahi Produk
+                <span>Beli Produk</span>
                 <ArrowRight className="h-5 w-5" />
               </Link>
               <Link
                 href="/sell"
                 className="inline-flex h-12 items-center gap-2 rounded-lg border border-slate-300 bg-white px-8 text-slate-900 font-semibold hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
-                Ingin Menjual?
+                Jual Produk
               </Link>
             </div>
           </div>

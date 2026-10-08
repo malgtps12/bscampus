@@ -16,7 +16,6 @@ function LoginForm() {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [userType, setUserType] = useState('user') // 'user' or 'admin'
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -29,26 +28,19 @@ function LoginForm() {
     setLoading(true)
 
     try {
-      const endpoint = userType === 'admin' ? '/api/auth/login' : '/api/auth/user-login'
-      
-      const payload = userType === 'admin' 
-        ? { username: formData.studentId, password: formData.password }
-        : { studentId: formData.studentId, password: formData.password }
-
-      const response = await fetch(endpoint, {
+      const response = await fetch('/api/auth/user-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          studentId: formData.studentId,
+          password: formData.password
+        })
       })
 
       const data = await response.json()
 
       if (response.ok) {
-        if (userType === 'admin') {
-          router.push('/admin')
-        } else {
-          router.push(redirect)
-        }
+        router.push(redirect)
         router.refresh()
       } else {
         setError(data.error || 'Login gagal')
@@ -83,95 +75,42 @@ function LoginForm() {
             </div>
           )}
 
-          <div className="flex border-b mb-6">
-            <button
-              type="button"
-              onClick={() => setUserType('user')}
-              className={`flex-1 py-3 font-medium text-center ${userType === 'user' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
-            >
-              Mahasiswa
-            </button>
-            <button
-              type="button"
-              onClick={() => setUserType('admin')}
-              className={`flex-1 py-3 font-medium text-center ${userType === 'admin' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
-            >
-              Admin
-            </button>
-          </div>
-
           <form onSubmit={handleSubmit} className="space-y-5">
-            {userType === 'user' ? (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    NIM
-                  </label>
-                  <input
-                    type="text"
-                    name="studentId"
-                    value={formData.studentId}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                    placeholder="Masukkan NIM Anda"
-                  />
-                </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                NIM
+              </label>
+              <input
+                type="text"
+                name="studentId"
+                value={formData.studentId}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                placeholder="Masukkan NIM Anda"
+              />
+            </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Password
-                  </label>
-                  <input
-                    type="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                    placeholder="Masukkan password Anda"
-                  />
-                </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Password
+              </label>
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                placeholder="Masukkan password Anda"
+              />
+            </div>
 
-                <div className="text-right">
-                  <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-800">
-                    Lupa password?
-                  </Link>
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Username Admin
-                  </label>
-                  <input
-                    type="text"
-                    name="studentId"
-                    value={formData.studentId}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                    placeholder="Masukkan username admin"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Password Admin
-                  </label>
-                  <input
-                    type="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                    placeholder="Masukkan password admin"
-                  />
-                </div>
-              </>
-            )}
+            <div className="text-right">
+              <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-800">
+                Lupa password?
+              </Link>
+            </div>
 
             <button
               type="submit"
@@ -181,14 +120,12 @@ function LoginForm() {
               {loading ? 'Memproses...' : 'Masuk'}
             </button>
 
-            {userType === 'user' && (
-              <p className="text-center text-gray-600 text-sm mt-6">
-                Belum punya akun?{' '}
-                <Link href="/register" className="text-blue-600 hover:text-blue-800 font-medium">
-                  Daftar di sini
-                </Link>
-              </p>
-            )}
+            <p className="text-center text-gray-600 text-sm mt-6">
+              Belum punya akun?{' '}
+              <Link href="/register" className="text-blue-600 hover:text-blue-800 font-medium">
+                Daftar di sini
+              </Link>
+            </p>
 
             <p className="text-center text-gray-500 text-xs mt-4">
               Dengan login, Anda menyetujui{' '}
