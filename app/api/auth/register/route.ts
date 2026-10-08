@@ -17,9 +17,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!validateInput(name) || !validateInput(studentId) || !validateInput(email)) {
+    if (!validateInput(name) || !validateInput(studentId)) {
       return NextResponse.json(
-        { error: "Input tidak valid" },
+        { error: "Nama atau NIM mengandung karakter tidak valid" },
         { status: 400 }
       )
     }
@@ -39,13 +39,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: existingUser } = await supabase
+    const { data: existingUsers, error: checkError } = await supabase
       .from('users')
       .select('id')
       .or(`student_id.eq.${studentId},email.eq.${email}`)
-      .single()
 
-    if (existingUser) {
+    if (checkError) {
+      console.error("[Register] Check error:", checkError)
+      if (checkError.code === '42P01') {
+        return NextResponse.json(
+          { error: "Tabel users belum dibuat. Jalankan SQL schema terlebih dahulu." },
+          { status: 500 }
+        )
+      }
+    }
+
+    if (existingUsers && existingUsers.length > 0) {
       return NextResponse.json(
         { error: "NIM atau email sudah terdaftar" },
         { status: 400 }
@@ -68,7 +77,7 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       console.error("[Register] Insert error:", insertError)
       return NextResponse.json(
-        { error: "Gagal mendaftar. Silakan coba lagi." },
+        { error: `Gagal mendaftar: ${insertError.message || 'Silakan coba lagi.'}` },
         { status: 500 }
       )
     }
