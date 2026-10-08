@@ -152,3 +152,39 @@ CREATE TRIGGER update_users_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- Transactions/Sales table
+CREATE TABLE IF NOT EXISTS transactions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  product_id UUID NOT NULL,
+  product_title VARCHAR(255) NOT NULL,
+  seller_id UUID NOT NULL,
+  seller_name VARCHAR(100) NOT NULL,
+  seller_student_id VARCHAR(20) NOT NULL,
+  buyer_id UUID,
+  buyer_name VARCHAR(100),
+  price INTEGER NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'paid', 'shipped', 'completed', 'cancelled')),
+  payment_method VARCHAR(50),
+  paid_at TIMESTAMP WITH TIME ZONE,
+  transferred_at TIMESTAMP WITH TIME ZONE,
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Create indexes for transactions
+CREATE INDEX IF NOT EXISTS idx_transactions_seller_id ON transactions(seller_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_buyer_id ON transactions(buyer_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_product_id ON transactions(product_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);
+CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC);
+
+-- Create trigger for transactions updated_at
+CREATE TRIGGER update_transactions_updated_at
+    BEFORE UPDATE ON transactions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();

@@ -61,7 +61,7 @@ export default function AdminLoginPage() {
       const data = await response.json();
       localStorage.setItem("admin_token", data.token);
       
-      router.push("/admin/dashboard");
+      router.push("/admin/transactions");
     } catch (error) {
       console.error("Login error:", error);
       setError("Terjadi kesalahan koneksi. Silakan coba lagi.");
@@ -85,9 +85,13 @@ export default function AdminLoginPage() {
           </p>
 
           {error && (
-            <div className="mb-4 p-4 bg-red-100 border border-red-300 rounded-lg flex items-center gap-2 text-red-800 dark:bg-red-900 dark:border-red-700 dark:text-red-200">
+            <div className={`mb-4 p-4 rounded-lg flex items-center gap-2 text-sm ${
+              error.includes("berhasil") 
+                ? "bg-green-100 border border-green-300 text-green-800 dark:bg-green-900 dark:border-green-700 dark:text-green-200"
+                : "bg-red-100 border border-red-300 text-red-800 dark:bg-red-900 dark:border-red-700 dark:text-red-200"
+            }`}>
               <AlertCircle className="h-5 w-5 shrink-0" />
-              <span className="text-sm">{error}</span>
+              <span>{error}</span>
             </div>
           )}
 
