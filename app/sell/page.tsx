@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -8,6 +9,9 @@ import { ArrowLeft, Upload, Plus, X } from "lucide-react";
 import { uploadProductImages } from "@/lib/storage";
 
 export default function SellPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -18,6 +22,49 @@ export default function SellPage() {
     studentId: "",
     phone: "",
   });
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const response = await fetch("/api/auth/me");
+      const data = await response.json();
+      
+      if (!response.ok || !data.user) {
+        router.push("/login?redirect=/sell");
+        return;
+      }
+      
+      setUser(data.user);
+      setFormData(prev => ({
+        ...prev,
+        sellerName: data.user.name,
+        studentId: data.user.studentId,
+        phone: data.user.phone,
+      }));
+    } catch (error) {
+      router.push("/login?redirect=/sell");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="h-12 w-12 animate-spin rounded-full border-t-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-slate-600">Memuat...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
+import { verifyJWT } from "@/lib/auth-utils";
 
 export const runtime = 'nodejs'
 
@@ -28,6 +29,24 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const token = request.cookies.get("user_token")?.value
+
+    if (!token) {
+      return NextResponse.json(
+        { error: "Anda harus login terlebih dahulu untuk menjual produk" },
+        { status: 401 }
+      )
+    }
+
+    const decoded = verifyJWT(token)
+
+    if (!decoded) {
+      return NextResponse.json(
+        { error: "Token tidak valid. Silakan login kembali" },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json();
     
     console.log("[DEBUG] Received payload:", JSON.stringify(body, null, 2));

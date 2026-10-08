@@ -8,6 +8,7 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const registered = searchParams.get('registered') === 'true'
+  const redirect = searchParams.get('redirect') || '/'
 
   const [formData, setFormData] = useState({
     studentId: '',
@@ -43,7 +44,11 @@ function LoginForm() {
       const data = await response.json()
 
       if (response.ok) {
-        router.push(userType === 'admin' ? '/admin' : '/')
+        if (userType === 'admin') {
+          router.push('/admin')
+        } else {
+          router.push(redirect)
+        }
         router.refresh()
       } else {
         setError(data.error || 'Login gagal')
