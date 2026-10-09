@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { findUserByEmail } from "@/lib/user"
-import { deleteOldResetCodes, createResetCode } from "@/lib/password-reset"
+import { supabase } from "@/lib/supabase"
 import { sendEmail } from "@/lib/email"
 import { generateResetCodeEmailTemplate } from "@/lib/email-templates"
 
@@ -30,21 +29,42 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const user = await findUserByEmail(email)
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, name, email')
+      .eq('email', email)
+      .single()
 
-    if (!user) {
+    if (userError || !user) {
       return NextResponse.json(
         { error: "Email tidak terdaftar" },
         { status: 404 }
       )
     }
 
-    await deleteOldResetCodes(user._id!.toString())
+    const { error: deleteError } = await supabase
+      .from('password_reset_codes')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('used', false)
+
+    if (deleteError) {
+      console.error("[Forgot Password] Delete old codes error:", deleteError)
+    }
 
     const resetCode = generateResetCode()
-    const created = await createResetCode(user._id!.toString(), resetCode)
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
 
-    if (!created) {
+    const { error: insertError } = await supabase
+      .from('password_reset_codes')
+      .insert({
+        user_id: user.id,
+        reset_code: resetCode,
+        expires_at: expiresAt.toISOString()
+      })
+
+    if (insertError) {
+      console.error("[Forgot Password] Insert code error:", insertError)
       return NextResponse.json(
         { error: "Gagal membuat kode reset" },
         { status: 500 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
+import { findUserByEmail } from "@/lib/user"
+import { findResetCode, markResetCodeUsed } from "@/lib/password-reset"
 import bcrypt from "bcryptjs"
 
 export const runtime = 'nodejs'
@@ -30,38 +31,26 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id, email')
-      .eq('email', email)
-      .single()
+    const user = await findUserByEmail(email)
 
-    if (userError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: "Email tidak valid" },
         { status: 404 }
       )
     }
 
-    const { data: resetCode, error: codeError } = await supabase
-      .from('password_reset_codes')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('reset_code', code)
-      .eq('used', false)
-      .single()
+    const resetCode = await findResetCode(user._id!.toString(), code)
 
-    if (codeError || !resetCode) {
+    if (!resetCode) {
       return NextResponse.json(
         { error: "Kode tidak valid atau sudah digunakan" },
         { status: 400 }
       )
     }
 
-    const expiresAt = new Date(resetCode.expires_at)
     const now = new Date()
-
-    if (now > expiresAt) {
+    if (now > resetCode.expires_at) {
       return NextResponse.json(
         { error: "Kode sudah kadaluarsa. Silakan minta kode baru." },
         { status: 400 }
@@ -70,27 +59,17 @@ export async function POST(request: NextRequest) {
 
     const passwordHash = await bcrypt.hash(newPassword, 10)
 
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ password_hash: passwordHash })
-      .eq('id', user.id)
+    const { updateUserPassword } = await import("@/lib/user")
+    const updated = await updateUserPassword(user._id!.toString(), passwordHash)
 
-    if (updateError) {
-      console.error("[Reset Password] Update password error:", updateError)
+    if (!updated) {
       return NextResponse.json(
         { error: "Gagal mengubah password" },
         { status: 500 }
       )
     }
 
-    const { error: markUsedError } = await supabase
-      .from('password_reset_codes')
-      .update({ used: true })
-      .eq('id', resetCode.id)
-
-    if (markUsedError) {
-      console.error("[Reset Password] Mark code used error:", markUsedError)
-    }
+    await markResetCodeUsed(resetCode._id!)
 
     return NextResponse.json({
       success: true,
