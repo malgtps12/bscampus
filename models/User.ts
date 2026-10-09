@@ -31,8 +31,8 @@ const UserSchema = new mongoose.Schema({
   }
 })
 
-// Update timestamp sebelum save
-UserSchema.pre('save', function(next) {
+// Update timestamp sebelum save (gunakan function biasa, bukan arrow)
+UserSchema.pre('save', function(next: any) {
   this.updatedAt = new Date()
   next()
 })

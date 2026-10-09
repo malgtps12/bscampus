@@ -49,7 +49,7 @@ export async function createResetCode(email: string): Promise<{ code: string; su
     return { code, success: true }
   } catch (error: any) {
     console.error('[Reset Service] Error creating reset code:', error)
-    return { success: false, error: error.message }
+    return { code: '', success: false, error: error.message }
   }
 }
 
