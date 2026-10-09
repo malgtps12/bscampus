@@ -87,7 +87,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: "Kode reset password telah dikirim ke email Anda",
-      email: user.email
+      email: user.email,
+      ...(process.env.NODE_ENV === 'development' ? { resetCode } : {})
     })
   } catch (error) {
     console.error("[Forgot Password] Error:", error)

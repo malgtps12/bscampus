@@ -32,6 +32,9 @@ export default function ForgotPasswordPage() {
 
       if (response.ok) {
         setSuccess(data.message)
+        if (process.env.NODE_ENV === 'development' && data.resetCode) {
+          console.log('Reset Code (dev only):', data.resetCode)
+        }
         setStep(2)
       } else {
         setError(data.error)
@@ -134,6 +137,9 @@ export default function ForgotPasswordPage() {
 
       if (response.ok) {
         setSuccess('Kode baru telah dikirim ke email Anda')
+        if (process.env.NODE_ENV === 'development' && data.resetCode) {
+          console.log('Reset Code (dev only):', data.resetCode)
+        }
       } else {
         setError(data.error)
       }
@@ -251,7 +257,7 @@ export default function ForgotPasswordPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || resetCode.length !== 4}
                 className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Memverifikasi...' : 'Verifikasi Kode'}
@@ -261,7 +267,8 @@ export default function ForgotPasswordPage() {
                 <button
                   type="button"
                   onClick={handleResendCode}
-                  className="text-blue-600 hover:text-blue-800"
+                  disabled={loading}
+                  className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
                 >
                   Tidak menerima kode? Kirim ulang
                 </button>
