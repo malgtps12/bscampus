@@ -1,80 +1,101 @@
-import { NextRequest, NextResponse } from "next/server"
-import { findUserByEmail } from "@/lib/user"
-import { deleteOldResetCodes, createResetCode } from "@/lib/password-reset"
-import { sendEmail } from "@/lib/email"
-import { generateResetCodeEmailTemplate } from "@/lib/email-templates"
+/**
+ * API Endpoint: /api/auth/forgot-password
+ * Mengirim kode reset password 6 digit ke email
+ */
+
+import { NextRequest, NextResponse } from 'next/server'
+import { validateEmail } from '@/lib/reset-password-helper'
+import { createResetCode } from '@/services/reset-password-service'
+import { checkForgotPasswordRateLimit } from '@/services/reset-password-service'
+import { sendResetCodeEmail } from '@/lib/email-service'
+import { User } from '@/models/User'
 
 export const runtime = 'nodejs'
 
-function generateResetCode(): string {
-  return Math.floor(1000 + Math.random() * 9000).toString()
-}
-
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting check
+    const ip = request.headers.get('x-forwarded-for') || 'unknown'
+    const rateLimitCheck = await checkForgotPasswordRateLimit(ip)
+    
+    if (!rateLimitCheck.allowed) {
+      return NextResponse.json(
+        { error: 'Terlalu banyak permintaan. Silakan coba lagi nanti.' },
+        { status: 429, headers: { 'Retry-After': rateLimitCheck.retryAfter?.toString() || '900' } }
+      )
+    }
+    
+    // Parse request body
     const body = await request.json()
     const { email } = body
-
+    
     if (!email) {
       return NextResponse.json(
-        { error: "Email harus diisi" },
+        { error: 'Email harus diisi' },
         { status: 400 }
       )
     }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: "Format email tidak valid" },
-        { status: 400 }
-      )
+    
+    // Validasi format email
+    if (!validateEmail(email)) {
+      // Tetap return response yang sama untuk keamanan
+      return NextResponse.json({
+        success: true,
+        message: 'Jika email terdaftar, kode reset akan dikirim ke email Anda.'
+      })
     }
-
-    const user = await findUserByEmail(email)
-
+    
+    // Cek apakah email terdaftar
+    const user = await User.findOne({ email })
+    
+    // Untuk keamanan, selalu return response yang sama
+    // meskipun email tidak terdaftar
     if (!user) {
-      return NextResponse.json(
-        { error: "Email tidak terdaftar" },
-        { status: 404 }
-      )
+      console.log(`[Forgot Password] Email tidak terdaftar: ${email}`)
+      return NextResponse.json({
+        success: true,
+        message: 'Jika email terdaftar, kode reset akan dikirim ke email Anda.'
+      })
     }
-
-    await deleteOldResetCodes(user._id!.toString())
-
-    const resetCode = generateResetCode()
-    const created = await createResetCode(user._id!.toString(), resetCode)
-
-    if (!created) {
+    
+    // Buat kode reset baru (auto-replace kode lama)
+    const result = await createResetCode(email.toLowerCase())
+    
+    if (!result.success) {
       return NextResponse.json(
-        { error: "Gagal membuat kode reset" },
+        { error: 'Gagal membuat kode reset' },
         { status: 500 }
       )
     }
-
-    const { text, html } = generateResetCodeEmailTemplate(user.name, resetCode)
-
-    const emailSent = await sendEmail({
-      to: user.email,
-      subject: 'Kode Reset Password BSCampus',
-      text,
-      html
-    })
-
-    if (!emailSent) {
-      console.warn('[Forgot Password] Email sending failed, but code was created')
+    
+    // Kirim email dengan kode
+    const emailResult = await sendResetCodeEmail(email, result.code)
+    
+    if (!emailResult.success) {
+      // Tetap return success response untuk keamanan
+      console.error('[Forgot Password] Email sending failed:', emailResult.error)
+      return NextResponse.json({
+        success: true,
+        message: 'Jika email terdaftar, kode reset akan dikirim ke email Anda.'
+      })
     }
-
+    
+    // Log untuk development
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[Development] Reset code for ${email}: ${result.code}`)
+    }
+    
+    // Response standar untuk semua kasus (keamanan)
     return NextResponse.json({
       success: true,
-      message: "Kode reset password telah dikirim ke email Anda",
-      email: user.email,
-      ...(process.env.NODE_ENV === 'development' ? { resetCode } : {})
+      message: 'Jika email terdaftar, kode reset akan dikirim ke email Anda.'
     })
-  } catch (error) {
-    console.error("[Forgot Password] Error:", error)
-    return NextResponse.json(
-      { error: "Terjadi kesalahan. Silakan coba lagi." },
-      { status: 500 }
-    )
+    
+  } catch (error: any) {
+    console.error('[Forgot Password] Error:', error)
+    return NextResponse.json({
+      success: true,
+      message: 'Jika email terdaftar, kode reset akan dikirim ke email Anda.'
+    })
   }
 }

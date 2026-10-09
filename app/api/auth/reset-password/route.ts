@@ -1,84 +1,97 @@
-import { NextRequest, NextResponse } from "next/server"
-import { findUserByEmail } from "@/lib/user"
-import { findResetCode, markResetCodeUsed } from "@/lib/password-reset"
-import bcrypt from "bcryptjs"
+/**
+ * API Endpoint: /api/auth/reset-password
+ * Reset password dengan kode verifikasi 6 digit
+ */
+
+import { NextRequest, NextResponse } from 'next/server'
+import { validateResetCodeFormat, validatePassword } from '@/lib/reset-password-helper'
+import { resetPasswordService } from '@/services/reset-password-service'
+import { checkResetPasswordRateLimit } from '@/services/reset-password-service'
+import { validateEmail } from '@/lib/reset-password-helper'
 
 export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting check
+    const ip = request.headers.get('x-forwarded-for') || 'unknown'
+    const rateLimitCheck = await checkResetPasswordRateLimit(ip)
+    
+    if (!rateLimitCheck.allowed) {
+      return NextResponse.json(
+        { error: 'Terlalu banyak percobaan. Silakan coba lagi nanti.' },
+        { status: 429, headers: { 'Retry-After': rateLimitCheck.retryAfter?.toString() || '900' } }
+      )
+    }
+    
+    // Parse request body
     const body = await request.json()
     const { email, code, newPassword, confirmPassword } = body
-
+    
+    // Validasi input required
     if (!email || !code || !newPassword || !confirmPassword) {
       return NextResponse.json(
-        { error: "Semua field harus diisi" },
+        { error: 'Semua field harus diisi' },
         { status: 400 }
       )
     }
-
+    
+    // Validasi email format
+    if (!validateEmail(email)) {
+      return NextResponse.json(
+        { error: 'Format email tidak valid' },
+        { status: 400 }
+      )
+    }
+    
+    // Validasi kode 6 digit
+    if (!validateResetCodeFormat(code)) {
+      return NextResponse.json(
+        { error: 'Kode harus 6 digit angka' },
+        { status: 400 }
+      )
+    }
+    
+    // Validasi password minimal 8 karakter
+    const passwordValidation = validatePassword(newPassword)
+    if (!passwordValidation.valid) {
+      return NextResponse.json(
+        { error: passwordValidation.message },
+        { status: 400 }
+      )
+    }
+    
+    // Validasi password dan konfirmasi password sama
     if (newPassword !== confirmPassword) {
       return NextResponse.json(
-        { error: "Password dan konfirmasi password tidak cocok" },
+        { error: 'Password dan konfirmasi password tidak cocok' },
         { status: 400 }
       )
     }
-
-    if (newPassword.length < 6) {
+    
+    // Reset password service
+    const result = await resetPasswordService(
+      email.toLowerCase(),
+      code,
+      newPassword
+    )
+    
+    if (!result.success) {
       return NextResponse.json(
-        { error: "Password minimal 6 karakter" },
+        { error: result.error || 'Gagal reset password' },
         { status: 400 }
       )
     }
-
-    const user = await findUserByEmail(email)
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "Email tidak valid" },
-        { status: 404 }
-      )
-    }
-
-    const resetCode = await findResetCode(user._id!.toString(), code)
-
-    if (!resetCode) {
-      return NextResponse.json(
-        { error: "Kode tidak valid atau sudah digunakan" },
-        { status: 400 }
-      )
-    }
-
-    const now = new Date()
-    if (now > resetCode.expires_at) {
-      return NextResponse.json(
-        { error: "Kode sudah kadaluarsa. Silakan minta kode baru." },
-        { status: 400 }
-      )
-    }
-
-    const passwordHash = await bcrypt.hash(newPassword, 10)
-
-    const { updateUserPassword } = await import("@/lib/user")
-    const updated = await updateUserPassword(user._id!.toString(), passwordHash)
-
-    if (!updated) {
-      return NextResponse.json(
-        { error: "Gagal mengubah password" },
-        { status: 500 }
-      )
-    }
-
-    await markResetCodeUsed(resetCode._id!)
-
+    
     return NextResponse.json({
       success: true,
-      message: "Password berhasil diubah. Silakan login dengan password baru."
+      message: 'Password berhasil direset. Silakan login dengan password baru.'
     })
-  } catch (error) {
-    console.error("[Reset Password] Error:", error)
+    
+  } catch (error: any) {
+    console.error('[Reset Password] Error:', error)
     return NextResponse.json(
-      { error: "Terjadi kesalahan. Silakan coba lagi." },
+      { error: 'Terjadi kesalahan internal. Silakan coba lagi.' },
       { status: 500 }
     )
   }
