@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateEmail } from '@/lib/reset-password-helper'
 import { createResetCode } from '@/services/reset-password-service'
 import { checkForgotPasswordRateLimit } from '@/services/reset-password-service'
-import { sendResetCodeEmail } from '@/lib/email-service'
+import { sendResetCodeEmail } from '@/lib/email'
 import { User } from '@/models/User'
 
 export const runtime = 'nodejs'
@@ -71,21 +71,14 @@ export async function POST(request: NextRequest) {
     // Kirim email dengan kode
     const emailResult = await sendResetCodeEmail(email, result.code)
     
-    if (!emailResult.success) {
-      // Tetap return success response untuk keamanan
-      console.error('[Forgot Password] Email sending failed:', emailResult.error)
-      return NextResponse.json({
-        success: true,
-        message: 'Jika email terdaftar, kode reset akan dikirim ke email Anda.'
-      })
+    if (!emailResult) {
+      console.error('[Forgot Password] Email sending failed')
     }
     
-    // Log untuk development
     if (process.env.NODE_ENV === 'development') {
       console.log(`[Development] Reset code for ${email}: ${result.code}`)
     }
     
-    // Response standar untuk semua kasus (keamanan)
     return NextResponse.json({
       success: true,
       message: 'Jika email terdaftar, kode reset akan dikirim ke email Anda.'
