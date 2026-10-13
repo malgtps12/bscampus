@@ -41,8 +41,8 @@ export function validateInput(input: string): boolean {
   
   const sqlInjectionPatterns = [
     /(\b(UNION|SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\b)/i,
-    /(-{2}|\/\*|\*\/|;|\|{2}|&&)/,
-    /('|")(.*)(--|-#|\/\*|\*\/|xp_|sp_)/i,
+    /(\/\*|\*\/|;|\|{2})/,
+    /('|")(.*)(--|xp_|sp_)/i,
   ]
   
   for (const pattern of sqlInjectionPatterns) {
