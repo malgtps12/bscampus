@@ -10,7 +10,7 @@ export function CategoryFilter({
   onCategoryChange,
 }: CategoryFilterProps) {
   return (
-    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
       {categories.map((category) => (
         <button
           key={category.id}

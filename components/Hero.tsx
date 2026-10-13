@@ -3,7 +3,7 @@ import { ArrowRight, GraduationCap, ShieldCheck, Handshake } from "lucide-react"
 
 export function Hero() {
   return (
-    <div className="relative overflow-hidden bg-gradient-to-b from-slate-50 to-white py-16 dark:from-slate-950 dark:to-slate-950">
+    <div className="relative overflow-x-hidden bg-gradient-to-b from-slate-50 to-white py-16 dark:from-slate-950 dark:to-slate-950">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
           <div>
