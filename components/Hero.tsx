@@ -16,17 +16,17 @@ export function Hero() {
             <p className="mt-6 text-lg text-slate-600 dark:text-slate-400">
               Platform jual beli produk mahasiswa terpercaya di kampus Politeknik Negeri Lhokseumawe. Beli barang bekas, buku, elektronik, dan kebutuhan kampus lainnya dengan harga terbaik.
             </p>
-            <div className="mt-8 flex flex-wrap gap-4">
+            <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <Link
                 href="/products"
-                className="inline-flex h-12 items-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-8 text-white font-semibold hover:shadow-lg transition-all hover:scale-105"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-8 text-white font-semibold hover:shadow-lg transition-all hover:scale-105"
               >
                 <span>Beli Produk</span>
                 <ArrowRight className="h-5 w-5" />
               </Link>
               <Link
                 href="/sell"
-                className="inline-flex h-12 items-center gap-2 rounded-lg border border-slate-300 bg-white px-8 text-slate-900 font-semibold hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-8 text-slate-900 font-semibold hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 Jual Produk
               </Link>
