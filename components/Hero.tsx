@@ -56,7 +56,7 @@ export function Hero() {
                   <Handshake className="h-10 w-10 text-cyan-500 mb-4" />
                   <h3 className="font-semibold text-lg">Komunitas Kampus</h3>
                   <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
-                    Connect dengan sesama mahasiswa Polinema dan bangun jaringan
+                    Connect dengan sesama mahasiswa PNL dan bangun jaringan
                   </p>
                 </div>
                 <div className="rounded-xl bg-white p-6 shadow-lg dark:bg-slate-900">
