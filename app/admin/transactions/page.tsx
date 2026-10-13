@@ -69,11 +69,22 @@ export default function AdminTransactionsPage() {
 
   const fetchTransactions = async () => {
     try {
-      const response = await fetch('/api/admin/transactions')
+      const token = localStorage.getItem('admin_token')
+      if (!token) {
+        router.push('/admin')
+        return
+      }
+
+      const response = await fetch('/api/admin/transactions', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      })
       const data = await response.json()
 
       if (!response.ok) {
         if (response.status === 401) {
+          localStorage.removeItem('admin_token')
           router.push('/admin')
           return
         }
@@ -90,9 +101,18 @@ export default function AdminTransactionsPage() {
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
+      const token = localStorage.getItem('admin_token')
+      if (!token) {
+        router.push('/admin')
+        return
+      }
+
       const response = await fetch('/api/admin/transactions', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ transactionId: id, status: newStatus })
       })
 
@@ -108,9 +128,18 @@ export default function AdminTransactionsPage() {
     setTransferring(transactionId)
     
     try {
+      const token = localStorage.getItem('admin_token')
+      if (!token) {
+        router.push('/admin')
+        return
+      }
+
       const response = await fetch('/api/admin/transactions', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ transactionId, status: 'transferred', notes: `Transfer via admin - ${new Date().toLocaleDateString('id-ID')}` })
       })
 
@@ -130,9 +159,18 @@ export default function AdminTransactionsPage() {
     if (!noteModal) return
     
     try {
+      const token = localStorage.getItem('admin_token')
+      if (!token) {
+        router.push('/admin')
+        return
+      }
+
       const response = await fetch('/api/admin/transactions', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ transactionId, notes: noteModal.notes })
       })
 

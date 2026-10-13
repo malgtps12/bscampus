@@ -1,15 +1,28 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
+import { verifyJWT } from "@/lib/auth-utils"
 
 export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
   try {
-    const adminToken = request.headers.get("authorization")?.split(" ")[1]
+    const authHeader = request.headers.get("authorization")
+    const token = authHeader?.split(" ")[1]
+    const cookieToken = request.cookies.get("admin_token")?.value
 
-    if (!adminToken || adminToken !== process.env.ADMIN_USERNAME) {
+    const adminToken = token || cookieToken
+
+    if (!adminToken) {
       return NextResponse.json(
-        { error: "Unauthorized" },
+        { error: "Unauthorized - No token provided" },
+        { status: 401 }
+      )
+    }
+
+    const decoded = verifyJWT(adminToken)
+    if (!decoded) {
+      return NextResponse.json(
+        { error: "Unauthorized - Invalid or expired token" },
         { status: 401 }
       )
     }
@@ -79,11 +92,23 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const adminToken = request.headers.get("authorization")?.split(" ")[1]
+    const authHeader = request.headers.get("authorization")
+    const token = authHeader?.split(" ")[1]
+    const cookieToken = request.cookies.get("admin_token")?.value
 
-    if (!adminToken || adminToken !== process.env.ADMIN_USERNAME) {
+    const adminToken = token || cookieToken
+
+    if (!adminToken) {
       return NextResponse.json(
-        { error: "Unauthorized" },
+        { error: "Unauthorized - No token provided" },
+        { status: 401 }
+      )
+    }
+
+    const decoded = verifyJWT(adminToken)
+    if (!decoded) {
+      return NextResponse.json(
+        { error: "Unauthorized - Invalid or expired token" },
         { status: 401 }
       )
     }
