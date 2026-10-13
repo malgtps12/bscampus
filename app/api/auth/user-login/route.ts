@@ -37,9 +37,17 @@ export async function POST(request: NextRequest) {
       .from('users')
       .select('*')
       .eq('student_id', studentId)
-      .single()
+      .maybeSingle()
 
-    if (error || !user) {
+    if (error) {
+      console.error('[User Login] Query error:', error)
+      return NextResponse.json(
+        { error: "NIM atau password salah" },
+        { status: 401 }
+      )
+    }
+
+    if (!user) {
       return NextResponse.json(
         { error: "NIM atau password salah" },
         { status: 401 }

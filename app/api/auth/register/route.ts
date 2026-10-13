@@ -39,14 +39,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: existingUsers, error: checkError } = await supabase
+    // Cek NIM sudah ada atau tidak
+    const { data: existingByStudentId, error: studentIdError } = await supabase
       .from('users')
       .select('id')
-      .or(`student_id.eq.${studentId},email.eq.${email}`)
+      .eq('student_id', studentId)
+      .limit(1)
 
-    if (checkError) {
-      console.error("[Register] Check error:", checkError)
-      if (checkError.code === '42P01') {
+    if (studentIdError) {
+      console.error("[Register] Check NIM error:", studentIdError)
+      if (studentIdError.code === '42P01') {
         return NextResponse.json(
           { error: "Tabel users belum dibuat. Jalankan SQL schema terlebih dahulu." },
           { status: 500 }
@@ -54,9 +56,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (existingUsers && existingUsers.length > 0) {
+    if (existingByStudentId && existingByStudentId.length > 0) {
       return NextResponse.json(
-        { error: "NIM atau email sudah terdaftar" },
+        { error: "NIM sudah terdaftar" },
+        { status: 400 }
+      )
+    }
+
+    // Cek email sudah ada atau tidak
+    const { data: existingByEmail, error: emailError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .limit(1)
+
+    if (emailError) {
+      console.error("[Register] Check email error:", emailError)
+    }
+
+    if (existingByEmail && existingByEmail.length > 0) {
+      return NextResponse.json(
+        { error: "Email sudah terdaftar" },
         { status: 400 }
       )
     }
