@@ -3,8 +3,12 @@ const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || ""
 const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production"
 const RATE_LIMIT_WINDOW = 15 * 60 * 1000
 const MAX_ATTEMPTS = 5
+const REGISTER_RATE_LIMIT_WINDOW = 60 * 60 * 1000
+const MAX_REGISTER_ATTEMPTS = 10
 
 const loginAttempts = new Map<string, { count: number; resetTime: number }>()
+const registerAttempts = new Map<string, { count: number; resetTime: number }>()
+const apiCallAttempts = new Map<string, { count: number; resetTime: number }>()
 
 export function generateJWT(username: string): string {
   const payload = {
@@ -70,6 +74,56 @@ export function checkRateLimit(ip: string): boolean {
   return true
 }
 
+export function checkRegisterRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const attempt = registerAttempts.get(ip)
+  
+  if (!attempt) {
+    registerAttempts.set(ip, { count: 1, resetTime: now + REGISTER_RATE_LIMIT_WINDOW })
+    return true
+  }
+  
+  if (now > attempt.resetTime) {
+    registerAttempts.set(ip, { count: 1, resetTime: now + REGISTER_RATE_LIMIT_WINDOW })
+    return true
+  }
+  
+  if (attempt.count >= MAX_REGISTER_ATTEMPTS) {
+    return false
+  }
+  
+  attempt.count++
+  return true
+}
+
+export function checkApiRateLimit(ip: string, limit: number = 100): boolean {
+  const now = Date.now()
+  const attempt = apiCallAttempts.get(ip)
+  
+  if (!attempt) {
+    apiCallAttempts.set(ip, { count: 1, resetTime: now + 60 * 1000 })
+    return true
+  }
+  
+  if (now > attempt.resetTime) {
+    apiCallAttempts.set(ip, { count: 1, resetTime: now + 60 * 1000 })
+    return true
+  }
+  
+  if (attempt.count >= limit) {
+    return false
+  }
+  
+  attempt.count++
+  return true
+}
+
 export function sanitizeUsername(username: string): string {
   return username.trim().replace(/[^a-zA-Z0-9_-]/g, '')
+}
+
+export function resetRateLimit(ip: string) {
+  loginAttempts.delete(ip)
+  registerAttempts.delete(ip)
+  apiCallAttempts.delete(ip)
 }

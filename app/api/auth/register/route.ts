@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
-import { validateInput } from "@/lib/auth-utils"
+import { validateInput, checkRegisterRateLimit } from "@/lib/auth-utils"
 import bcrypt from "bcryptjs"
 
 export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
+    
+    if (!checkRegisterRateLimit(ip)) {
+      console.warn(`[Security] Register rate limit exceeded for IP: ${ip}`)
+      return NextResponse.json(
+        { error: "Terlalu banyak percobaan registrasi. Coba lagi dalam 1 jam." },
+        { status: 429 }
+      )
+    }
+
     const body = await request.json()
     const { name, studentId, email, phone, campus, password } = body
 
