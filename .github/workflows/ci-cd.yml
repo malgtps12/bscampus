@@ -31,7 +31,10 @@ jobs:
           echo "node: $(node -v) | npm: $(npm -v)"
           echo "--- isi node_modules/.bin (jest*) ---"
           ls node_modules/.bin | grep -i jest || echo "TIDAK ADA jest di .bin"
-
+          echo "--- jalankan jest langsung ---"
+          npx jest 2>&1 | tail -40
+          echo "jest-exit=${PIPESTATUS[0]}"
+          echo "--- jalankan npm test ---"
           npm test
 
       - name: Build
