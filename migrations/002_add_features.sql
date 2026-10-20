@@ -61,12 +61,3 @@ CREATE TRIGGER reviews_update_rating
 AFTER INSERT OR UPDATE OR DELETE ON reviews
 FOR EACH ROW EXECUTE FUNCTION trigger_update_product_rating();
 
--- Admin 2FA secrets table
-CREATE TABLE IF NOT EXISTS admin_2fa (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  admin_username VARCHAR(100) NOT NULL UNIQUE,
-  secret TEXT NOT NULL,
-  enabled BOOLEAN DEFAULT false,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);

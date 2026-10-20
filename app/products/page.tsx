@@ -8,17 +8,11 @@ import { Footer } from "@/components/Footer";
 import { Search } from "lucide-react";
 import { Product } from "@/lib/types";
 
-export const dynamic = 'force-dynamic'
-
 export default function ProductsPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchProducts();
-  }, []);
 
   const fetchProducts = async () => {
     try {
@@ -34,6 +28,12 @@ export default function ProductsPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // Ambil data saat mount - setState terjadi setelah await (async)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchProducts();
+  }, []);
 
   let filteredProducts = products;
 

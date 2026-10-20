@@ -14,8 +14,21 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
   title: "BSCampus - Marketplace Politeknik Negeri Lhokseumawe",
   description: "Platform jual beli produk mahasiswa di kampus Politeknik Negeri Lhokseumawe",
+  keywords: [
+    "marketplace mahasiswa",
+    "jual beli kampus",
+    "Politeknik Negeri Lhokseumawe",
+    "BSCampus",
+  ],
+  openGraph: {
+    title: "BSCampus - Marketplace Politeknik Negeri Lhokseumawe",
+    description: "Platform jual beli produk mahasiswa di kampus Politeknik Negeri Lhokseumawe",
+    type: "website",
+    locale: "id_ID",
+  },
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -37,7 +50,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
-      lang="en"
+      lang="id"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >

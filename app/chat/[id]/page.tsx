@@ -19,6 +19,12 @@ interface Message {
   }
 }
 
+interface ChatRoomUser {
+  id: string
+  name: string
+  studentId: string
+}
+
 export default function ChatRoomPage() {
   const params = useParams()
   const router = useRouter()
@@ -26,19 +32,8 @@ export default function ChatRoomPage() {
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<ChatRoomUser | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    checkAuth()
-    fetchMessages()
-    const interval = setInterval(fetchMessages, 3000)
-    return () => clearInterval(interval)
-  }, [params.id])
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -55,7 +50,7 @@ export default function ChatRoomPage() {
       }
       
       setUser(data.user)
-    } catch (error) {
+    } catch {
       router.push('/login')
     }
   }
@@ -73,6 +68,19 @@ export default function ChatRoomPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    checkAuth()
+    fetchMessages()
+    const interval = setInterval(fetchMessages, 3000)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.id])
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()

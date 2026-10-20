@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Trash2, Search, Filter, CheckCircle, XCircle, Clock, Box, DollarSign } from 'lucide-react'
+import { Search, CheckCircle, XCircle, Clock, Box, DollarSign } from 'lucide-react'
 
 interface Transaction {
   id: string
@@ -63,10 +63,6 @@ export default function AdminTransactionsPage() {
   const [noteModal, setNoteModal] = useState<{ id: string; notes: string } | null>(null)
   const [transferModal, setTransferModal] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchTransactions()
-  }, [filter])
-
   const fetchTransactions = async () => {
     try {
       const token = localStorage.getItem('admin_token')
@@ -99,30 +95,12 @@ export default function AdminTransactionsPage() {
     }
   }
 
-  const handleStatusChange = async (id: string, newStatus: string) => {
-    try {
-      const token = localStorage.getItem('admin_token')
-      if (!token) {
-        router.push('/admin')
-        return
-      }
-
-      const response = await fetch('/api/admin/transactions', {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ transactionId: id, status: newStatus })
-      })
-
-      if (response.ok) {
-        fetchTransactions()
-      }
-    } catch (error) {
-      console.error('Error updating status:', error)
-    }
-  }
+  useEffect(() => {
+    // Ambil data saat mount - setState terjadi setelah await (async)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchTransactions()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter])
 
   const handleTransfer = async (transactionId: string) => {
     setTransferring(transactionId)

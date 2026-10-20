@@ -21,7 +21,25 @@ export function AuthHeader() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
+  const checkAuth = async () => {
+    try {
+      const response = await fetch('/api/auth/me')
+      const data = await response.json()
+      
+      if (response.ok && data.user) {
+        setUser(data.user)
+      } else {
+        setUser(null)
+      }
+    } catch {
+      setUser(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     checkAuth()
   }, [])
 
@@ -35,23 +53,6 @@ export function AuthHeader() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
-
-  const checkAuth = async () => {
-    try {
-      const response = await fetch('/api/auth/me')
-      const data = await response.json()
-      
-      if (response.ok && data.user) {
-        setUser(data.user)
-      } else {
-        setUser(null)
-      }
-    } catch (error) {
-      setUser(null)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const logout = async () => {
     try {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { MessageCircle } from 'lucide-react'
@@ -31,32 +32,17 @@ interface Conversation {
   }
 }
 
+interface ChatUser {
+  id: string
+  name: string
+  studentId: string
+}
+
 export default function ChatListPage() {
   const router = useRouter()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
-
-  useEffect(() => {
-    checkAuth()
-  }, [])
-
-  const checkAuth = async () => {
-    try {
-      const response = await fetch('/api/auth/me')
-      const data = await response.json()
-      
-      if (!response.ok || !data.user) {
-        router.push('/login')
-        return
-      }
-      
-      setUser(data.user)
-      fetchConversations()
-    } catch (error) {
-      router.push('/login')
-    }
-  }
+  const [user, setUser] = useState<ChatUser | null>(null)
 
   const fetchConversations = async () => {
     try {
@@ -71,6 +57,29 @@ export default function ChatListPage() {
       setLoading(false)
     }
   }
+
+  const checkAuth = async () => {
+    try {
+      const response = await fetch('/api/auth/me')
+      const data = await response.json()
+      
+      if (!response.ok || !data.user) {
+        router.push('/login')
+        return
+      }
+      
+      setUser(data.user)
+      fetchConversations()
+    } catch {
+      router.push('/login')
+    }
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    checkAuth()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   if (loading) {
     return (
@@ -116,9 +125,11 @@ export default function ChatListPage() {
                   >
                     <div className="flex gap-4">
                       <div className="flex-shrink-0">
-                        <img
-                          src={conv.product.images?.[0] || 'https://via.placeholder.com/80'}
+                        <Image
+                          src={conv.product.images?.[0] || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&h=400'}
                           alt={conv.product.title}
+                          width={80}
+                          height={80}
                           className="w-20 h-20 object-cover rounded-lg"
                         />
                       </div>

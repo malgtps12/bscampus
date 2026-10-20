@@ -45,7 +45,7 @@ function LoginForm() {
       } else {
         setError(data.error || 'Login gagal')
       }
-    } catch (err) {
+    } catch {
       setError('Terjadi kesalahan. Silakan coba lagi.')
     } finally {
       setLoading(false)

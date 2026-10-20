@@ -1,6 +1,6 @@
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { GraduationCap, Target, Users, Shield } from "lucide-react";
+import { Target } from "lucide-react";
 
 export default function AboutPage() {
   return (
@@ -56,7 +56,7 @@ export default function AboutPage() {
                   Platform ini dibuat untuk menjawab masalah mahasiswa yang kesulitan menjual barang-barang bekas seperti buku, alat elektronik, dan peralatan kampus saat sudah tidak terpakai, serta mahasiswa baru yang mencari barang dengan harga terjangkau.
                 </p>
                 <p>
-                  Dengan motto <strong>"Kuliah, Jualan, Hemat"</strong>, BSCampus berkomitmen untuk membantu mahasiswa menghemat pengeluaran dan mendapatkan nilai lebih dari barang-barang yang sudah tidak terpakai.
+                  Dengan motto <strong>&quot;Kuliah, Jualan, Hemat&quot;</strong>, BSCampus berkomitmen untuk membantu mahasiswa menghemat pengeluaran dan mendapatkan nilai lebih dari barang-barang yang sudah tidak terpakai.
                 </p>
               </div>
             </div>

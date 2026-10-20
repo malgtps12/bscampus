@@ -92,17 +92,12 @@ Cek console log untuk melihat reset code (development mode).
 
 ## Email Templates
 
-BSCampus mengirim 2 jenis email:
+BSCampus mengirim 1 jenis email:
 
 ### 1. Reset Password Email
 - **Template**: `lib/email.ts` → `sendResetCodeEmail()`
 - **Trigger**: User request forgot password
 - **Contains**: 6-digit reset code (10 menit validity)
-
-### 2. Transaction Email (Optional - belum aktif)
-- **Template**: `lib/email.ts` → `sendTransactionEmail()`
-- **Trigger**: Transaction status update
-- **Contains**: Transaction details, status
 
 ## Troubleshooting
 

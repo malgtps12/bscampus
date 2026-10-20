@@ -29,7 +29,7 @@ export async function PUT(request: NextRequest) {
       ewalletNumber
     } = body
 
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
     if (name !== undefined) updateData.name = name
     if (phone !== undefined) updateData.phone = phone
     if (bankName !== undefined) updateData.bank_name = bankName

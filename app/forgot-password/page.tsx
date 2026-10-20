@@ -36,8 +36,8 @@ export default function ForgotPasswordPage() {
       
       setSuccess(data.message)
       setStep(2)
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Terjadi kesalahan. Silakan coba lagi.')
     } finally {
       setLoading(false)
     }
@@ -82,8 +82,8 @@ export default function ForgotPasswordPage() {
       setTimeout(() => {
         router.push('/login?reset=success')
       }, 2000)
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Terjadi kesalahan. Silakan coba lagi.')
     } finally {
       setLoading(false)
     }
@@ -103,8 +103,8 @@ export default function ForgotPasswordPage() {
       
       const data = await response.json()
       setSuccess(data.message)
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Terjadi kesalahan. Silakan coba lagi.')
     } finally {
       setLoading(false)
     }

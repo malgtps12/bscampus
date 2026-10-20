@@ -25,7 +25,34 @@ export async function GET(
     }
 
     const supabase = await createClient()
-    
+
+    const { data: currentUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('student_id', decoded.username)
+      .single()
+
+    if (!currentUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    }
+
+    // Pastikan caller adalah peserta percakapan (buyer atau seller)
+    const { data: conversation } = await supabase
+      .from('conversations')
+      .select('id, buyer_id, seller_id')
+      .eq('id', id)
+      .single()
+
+    if (
+      !conversation ||
+      (conversation.buyer_id !== currentUser.id && conversation.seller_id !== currentUser.id)
+    ) {
+      return NextResponse.json(
+        { error: "Forbidden - Anda bukan peserta percakapan ini" },
+        { status: 403 }
+      )
+    }
+
     const { data: messages, error } = await supabase
       .from('messages')
       .select(`
@@ -36,8 +63,8 @@ export async function GET(
       .order('created_at', { ascending: true })
 
     if (error) {
-      console.error("[Get Messages] Error:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error("[Get Messages] Error:", error.message)
+      return NextResponse.json({ error: "Gagal mengambil pesan" }, { status: 500 })
     }
 
     return NextResponse.json(messages)
@@ -92,6 +119,23 @@ export async function POST(
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
+    // Pastikan caller adalah peserta percakapan (buyer atau seller)
+    const { data: conversation } = await supabase
+      .from('conversations')
+      .select('id, buyer_id, seller_id')
+      .eq('id', id)
+      .single()
+
+    if (
+      !conversation ||
+      (conversation.buyer_id !== sender.id && conversation.seller_id !== sender.id)
+    ) {
+      return NextResponse.json(
+        { error: "Forbidden - Anda bukan peserta percakapan ini" },
+        { status: 403 }
+      )
+    }
+
     const { data: message, error } = await supabase
       .from('messages')
       .insert({
@@ -106,8 +150,8 @@ export async function POST(
       .single()
 
     if (error) {
-      console.error("[Send Message] Error:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error("[Send Message] Error:", error.message)
+      return NextResponse.json({ error: "Gagal mengirim pesan" }, { status: 500 })
     }
 
     return NextResponse.json(message, { status: 201 })

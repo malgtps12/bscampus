@@ -1,109 +1,161 @@
 /**
- * Service untuk manajemen kode reset password dengan rate limiting
+ * Service untuk manajemen kode reset password dengan rate limiting.
+ * Semua penyimpanan via Supabase (users + password_reset_codes) -
+ * satu-satunya sumber data, sejalan dengan login/register.
  */
 
 import { RateLimiterMemory } from 'rate-limiter-flexible'
-import { ResetPassword } from '@/models/ResetPassword'
-import { hashResetCode, verifyResetCode } from '@/lib/reset-password-helper'
+import { supabase } from '@/lib/supabase'
+import {
+  generateResetCode,
+  hashResetCode,
+  verifyResetCode,
+} from '@/lib/reset-password-helper'
+
+/** Masa berlaku kode reset. */
+const CODE_TTL_MINUTES = 10
+/** Percobaan salah sebelum kode dibuang. */
+const MAX_VERIFY_ATTEMPTS = 5
 
 // Rate limiter untuk forgot-password endpoint (5 requests per 15 menit per IP)
 const forgotPasswordLimiter = new RateLimiterMemory({
-  points: 5, // 5 attempts
-  duration: 900, // 15 menit
-  keyPrefix: 'forgot_password'
+  points: 5,
+  duration: 900,
+  keyPrefix: 'forgot_password',
 })
 
 // Rate limiter untuk reset-password endpoint (5 attempts per 15 menit per IP)
 const resetPasswordLimiter = new RateLimiterMemory({
   points: 5,
   duration: 900,
-  keyPrefix: 'reset_password'
+  keyPrefix: 'reset_password',
 })
 
+type ServiceResult<T> = T & { success: boolean; error?: string }
+
 /**
- * Membuat kode reset baru untuk email
- * - Generate kode 6 digit acak
- * - Hash kode dengan bcrypt
- * - Delete kode lama jika ada
- * - Simpan kode baru ke database
+ * Membuat kode reset baru untuk email:
+ * generate kode 6 digit -> hash bcrypt -> ganti kode lama (satu kode aktif per email).
  */
-export async function createResetCode(email: string): Promise<{ code: string; success: boolean; error?: string }> {
+export async function createResetCode(
+  email: string
+): Promise<ServiceResult<{ code: string }>> {
   try {
-    // Generate kode 6 digit acak
-    const { generateResetCode, hashResetCode } = await import('@/lib/reset-password-helper')
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle()
+
+    if (userError) {
+      console.error('[Reset Service] User lookup error:', userError.message)
+      return { code: '', success: false, error: userError.message }
+    }
+
+    if (!user) {
+      return { code: '', success: false, error: 'Email tidak terdaftar' }
+    }
+
     const code = generateResetCode()
-    
-    // Hash kode sebelum disimpan
     const codeHash = await hashResetCode(code)
-    
-    // Delete kode lama untuk email ini (satu kode aktif per email)
-    await ResetPassword.deleteOne({ email })
-    
-    // Simpan kode baru
-    await ResetPassword.create({
+
+    // Satu kode aktif per email - buang kode lama
+    const { error: deleteError } = await supabase
+      .from('password_reset_codes')
+      .delete()
+      .eq('user_id', user.id)
+
+    if (deleteError) {
+      console.error('[Reset Service] Delete old code error:', deleteError.message)
+      return { code: '', success: false, error: deleteError.message }
+    }
+
+    const { error: insertError } = await supabase.from('password_reset_codes').insert({
+      user_id: user.id,
       email,
-      codeHash,
-      attempts: 0
+      code_hash: codeHash,
+      attempts: 0,
+      expires_at: new Date(Date.now() + CODE_TTL_MINUTES * 60 * 1000).toISOString(),
     })
-    
+
+    if (insertError) {
+      console.error('[Reset Service] Insert code error:', insertError.message)
+      return { code: '', success: false, error: insertError.message }
+    }
+
     return { code, success: true }
-  } catch (error: any) {
-    console.error('[Reset Service] Error creating reset code:', error)
-    return { code: '', success: false, error: error.message }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('[Reset Service] Error creating reset code:', message)
+    return { code: '', success: false, error: message }
   }
 }
 
+type VerifyResult = { valid: boolean; error?: string }
+
 /**
- * Verifikasi kode reset
- * - Cek apakah ada kode untuk email
- * - Verifikasi kode dengan bcrypt.compare
- * - Increment attempt counter jika salah
- * - Delete kode jika attempt > 5
+ * Verifikasi kode reset:
+ * cek eksistensi + expiry + attempt limit, lalu bcrypt.compare.
+ * Percobaan salah di-increment; kode dibuang setelah MAX_VERIFY_ATTEMPTS.
  */
 export async function verifyResetCodeService(
   email: string,
   code: string
-): Promise<{ valid: boolean; error?: string }> {
+): Promise<VerifyResult> {
   try {
-    // Cari kode untuk email
-    const resetRecord = await ResetPassword.findOne({ email })
-    
-    if (!resetRecord) {
+    const { data: record, error: findError } = await supabase
+      .from('password_reset_codes')
+      .select('id, code_hash, attempts, expires_at')
+      .eq('email', email)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (findError) {
+      console.error('[Reset Service] Find code error:', findError.message)
+      return { valid: false, error: 'Gagal memverifikasi kode' }
+    }
+
+    if (!record) {
       return { valid: false, error: 'Kode tidak ditemukan atau sudah kadaluarsa' }
     }
-    
-    // Cek apakah attempt sudah melebihi batas
-    if (resetRecord.attempts >= 5) {
-      await ResetPassword.deleteOne({ email })
+
+    if (record.attempts >= MAX_VERIFY_ATTEMPTS) {
+      await supabase.from('password_reset_codes').delete().eq('id', record.id)
       return { valid: false, error: 'Terlalu banyak percobaan gagal. Silakan minta kode baru' }
     }
-    
-    // Verifikasi kode dengan bcrypt
-    const isValid = await verifyResetCode(code, resetRecord.codeHash)
-    
+
+    if (new Date(record.expires_at).getTime() < Date.now()) {
+      await supabase.from('password_reset_codes').delete().eq('id', record.id)
+      return { valid: false, error: 'Kode sudah kadaluarsa. Silakan minta kode baru' }
+    }
+
+    const isValid = await verifyResetCode(code, record.code_hash)
+
     if (!isValid) {
-      // Increment attempt counter
-      await ResetPassword.updateOne(
-        { email },
-        { $inc: { attempts: 1 } }
-      )
-      
+      const { error: updateError } = await supabase
+        .from('password_reset_codes')
+        .update({ attempts: record.attempts + 1 })
+        .eq('id', record.id)
+
+      if (updateError) {
+        console.error('[Reset Service] Increment attempts error:', updateError.message)
+      }
+
       return { valid: false, error: 'Kode tidak valid' }
     }
-    
+
     return { valid: true }
-  } catch (error: any) {
-    console.error('[Reset Service] Error verifying code:', error)
-    return { valid: false, error: error.message }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('[Reset Service] Error verifying code:', message)
+    return { valid: false, error: message }
   }
 }
 
 /**
- * Reset password dengan kode yang sudah diverifikasi
- * - Cari user by email
- * - Hash password baru
- * - Update password user
- * - Delete kode reset
+ * Reset password user berdasarkan kode yang sudah diverifikasi.
+ * Update users.password_hash (Supabase) lalu buang kode reset.
  */
 export async function resetPasswordService(
   email: string,
@@ -111,72 +163,89 @@ export async function resetPasswordService(
   newPassword: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Verifikasi kode terlebih dahulu
     const verification = await verifyResetCodeService(email, code)
-    
+
     if (!verification.valid) {
       return { success: false, error: verification.error }
     }
-    
-    // Import bcrypt untuk hash password baru
+
     const bcrypt = await import('bcryptjs')
-    
-    // Cari user
-    const { User } = await import('@/models/User')
-    const user = await User.findOne({ email })
-    
+
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle()
+
+    if (userError) {
+      console.error('[Reset Service] User lookup error:', userError.message)
+      return { success: false, error: 'Gagal memproses reset password' }
+    }
+
     if (!user) {
       return { success: false, error: 'User tidak ditemukan' }
     }
-    
-    // Hash password baru
+
     const passwordHash = await bcrypt.hash(newPassword, 10)
-    
-    // Update password user
-    user.passwordHash = passwordHash
-    user.updatedAt = new Date()
-    await user.save()
-    
-    // Delete kode reset setelah digunakan
-    await ResetPassword.deleteOne({ email })
-    
+
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ password_hash: passwordHash })
+      .eq('id', user.id)
+
+    if (updateError) {
+      console.error('[Reset Service] Update password error:', updateError.message)
+      return { success: false, error: 'Gagal menyimpan password baru' }
+    }
+
+    // Buang kode setelah dipakai
+    const { error: deleteError } = await supabase
+      .from('password_reset_codes')
+      .delete()
+      .eq('user_id', user.id)
+
+    if (deleteError) {
+      console.error('[Reset Service] Delete code error:', deleteError.message)
+    }
+
     return { success: true }
-  } catch (error: any) {
-    console.error('[Reset Service] Error resetting password:', error)
-    return { success: false, error: error.message }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('[Reset Service] Error resetting password:', message)
+    return { success: false, error: message }
   }
 }
 
-/**
- * Rate limiting check untuk forgot password endpoint
- */
-export async function checkForgotPasswordRateLimit(ip: string): Promise<{ allowed: boolean; retryAfter?: number }> {
+/** Rate limiting check untuk forgot password endpoint */
+export async function checkForgotPasswordRateLimit(
+  ip: string
+): Promise<{ allowed: boolean; retryAfter?: number }> {
   try {
-    const res = await forgotPasswordLimiter.consume(ip)
+    await forgotPasswordLimiter.consume(ip)
     return { allowed: true }
-  } catch (rlRejected: any) {
+  } catch (rlRejected) {
     if (rlRejected instanceof Error) {
       console.error('[Rate Limit] Error:', rlRejected)
       return { allowed: false }
-    } else {
-      return { allowed: false, retryAfter: Math.ceil(rlRejected.msBeforeNext / 1000) }
     }
+    const retryAfterMs = (rlRejected as { msBeforeNext?: number }).msBeforeNext
+    return { allowed: false, retryAfter: Math.ceil((retryAfterMs ?? 900000) / 1000) }
   }
 }
 
-/**
- * Rate limiting check untuk reset password endpoint
- */
-export async function checkResetPasswordRateLimit(ip: string): Promise<{ allowed: boolean; retryAfter?: number }> {
+/** Rate limiting check untuk reset password endpoint */
+export async function checkResetPasswordRateLimit(
+  ip: string
+): Promise<{ allowed: boolean; retryAfter?: number }> {
   try {
-    const res = await resetPasswordLimiter.consume(ip)
+    await resetPasswordLimiter.consume(ip)
     return { allowed: true }
-  } catch (rlRejected: any) {
+  } catch (rlRejected) {
     if (rlRejected instanceof Error) {
       console.error('[Rate Limit] Error:', rlRejected)
       return { allowed: false }
-    } else {
-      return { allowed: false, retryAfter: Math.ceil(rlRejected.msBeforeNext / 1000) }
     }
+    const retryAfterMs = (rlRejected as { msBeforeNext?: number }).msBeforeNext
+    return { allowed: false, retryAfter: Math.ceil((retryAfterMs ?? 900000) / 1000) }
   }
 }

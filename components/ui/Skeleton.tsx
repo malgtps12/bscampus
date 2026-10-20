@@ -57,7 +57,7 @@ export function SearchBarSkeleton() {
   )
 }
 
-export function SectionSkeleton({ title, description }: { title: string; description?: string }) {
+export function SectionSkeleton({ description }: { title?: string; description?: string }) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">

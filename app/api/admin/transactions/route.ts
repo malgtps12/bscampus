@@ -1,28 +1,23 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
-import { verifyJWT } from "@/lib/auth-utils"
+import { verifyAdminJWT } from "@/lib/auth-utils"
 
 export const runtime = 'nodejs'
 
+function getAdminFromRequest(request: NextRequest) {
+  const authHeader = request.headers.get("authorization")
+  const bearerToken = authHeader?.split(" ")[1]
+  const cookieToken = request.cookies.get("admin_token")?.value
+  return verifyAdminJWT(bearerToken || cookieToken)
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("authorization")
-    const token = authHeader?.split(" ")[1]
-    const cookieToken = request.cookies.get("admin_token")?.value
+    const admin = getAdminFromRequest(request)
 
-    const adminToken = token || cookieToken
-
-    if (!adminToken) {
+    if (!admin) {
       return NextResponse.json(
-        { error: "Unauthorized - No token provided" },
-        { status: 401 }
-      )
-    }
-
-    const decoded = verifyJWT(adminToken)
-    if (!decoded) {
-      return NextResponse.json(
-        { error: "Unauthorized - Invalid or expired token" },
+        { error: "Unauthorized - Akses khusus admin" },
         { status: 401 }
       )
     }
@@ -92,23 +87,11 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("authorization")
-    const token = authHeader?.split(" ")[1]
-    const cookieToken = request.cookies.get("admin_token")?.value
+    const admin = getAdminFromRequest(request)
 
-    const adminToken = token || cookieToken
-
-    if (!adminToken) {
+    if (!admin) {
       return NextResponse.json(
-        { error: "Unauthorized - No token provided" },
-        { status: 401 }
-      )
-    }
-
-    const decoded = verifyJWT(adminToken)
-    if (!decoded) {
-      return NextResponse.json(
-        { error: "Unauthorized - Invalid or expired token" },
+        { error: "Unauthorized - Akses khusus admin" },
         { status: 401 }
       )
     }
@@ -123,7 +106,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const updateData: any = { status }
+    const updateData: Record<string, unknown> = { status }
     if (notes) updateData.notes = notes
     if (status === 'transferred') {
       updateData.transferred_at = new Date().toISOString()

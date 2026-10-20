@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Product } from "@/lib/types";
 import { Phone, Calendar } from "lucide-react";
 
@@ -17,9 +18,11 @@ export function ProductCard({ product }: ProductCardProps) {
     <Link href={`/products/${product.id}`}>
       <div className="group overflow-hidden rounded-lg border border-slate-200 bg-white transition-all hover:border-cyan-500 hover:shadow-lg dark:border-slate-800 dark:bg-slate-950">
         <div className="relative h-48 w-full overflow-hidden bg-slate-100 dark:bg-slate-900">
-          <img
+          <Image
             src={product.images?.[0] || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&h=400"}
             alt={product.title}
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             className="h-full w-full object-cover transition-transform group-hover:scale-105"
           />
           <div className="absolute top-2 right-2">

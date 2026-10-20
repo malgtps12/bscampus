@@ -8,9 +8,18 @@ import { Footer } from "@/components/Footer";
 import { ArrowLeft, Upload, Plus, X } from "lucide-react";
 import { uploadProductImages } from "@/lib/storage";
 
+interface SellUser {
+  id: string
+  name: string
+  studentId: string
+  phone: string
+  email: string
+  campus: string
+}
+
 export default function SellPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<SellUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -26,10 +35,6 @@ export default function SellPage() {
     studentId: "",
     phone: "",
   });
-
-  useEffect(() => {
-    checkAuth();
-  }, []);
 
   const checkAuth = async () => {
     try {
@@ -48,12 +53,18 @@ export default function SellPage() {
         studentId: data.user.studentId,
         phone: data.user.phone,
       }));
-    } catch (error) {
+    } catch {
       router.push("/login?redirect=/sell");
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    checkAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) {
     return (
@@ -136,7 +147,7 @@ export default function SellPage() {
 
       setSubmitted(true);
       setTimeout(() => {
-        window.location.href = "/products?refresh=true";
+        router.push("/products?refresh=true");
       }, 2000);
     } catch (error) {
       console.error("Error:", error);
@@ -208,6 +219,8 @@ export default function SellPage() {
                     <div className="grid grid-cols-5 gap-3">
                       {imagePreviews.map((preview, index) => (
                         <div key={index} className="relative aspect-square">
+                          {/* Preview lokal (blob URL) - next/image tidak mendukung blob: */}
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={preview}
                             alt={`Preview ${index + 1}`}

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
-import { checkApiRateLimit } from "@/lib/auth-utils"
+import { checkApiRateLimit, verifyJWT, getClientIp } from "@/lib/auth-utils"
 
 export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
   try {
-    const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
+    const ip = getClientIp(request)
     
     if (!checkApiRateLimit(ip, 50)) {
       return NextResponse.json(
@@ -45,7 +45,18 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const reviews = data.map((review: any) => ({
+    type ReviewRow = {
+      id: string
+      product_id: string
+      user_id: string
+      rating: number
+      comment: string
+      created_at: string
+      updated_at: string
+      users: { name: string; student_id: string } | null
+    }
+
+    const reviews = (data as ReviewRow[]).map((review) => ({
       id: review.id,
       product_id: review.product_id,
       user_id: review.user_id,
@@ -68,7 +79,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
+    const ip = getClientIp(request)
     
     if (!checkApiRateLimit(ip, 20)) {
       return NextResponse.json(
@@ -77,12 +88,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body = await request.json()
-    const { product_id, user_id, rating, comment } = body
+    const token = request.cookies.get("user_token")?.value
+    const decoded = token ? verifyJWT(token) : null
 
-    if (!product_id || !user_id || !rating) {
+    if (!decoded) {
       return NextResponse.json(
-        { error: "Product ID, User ID, dan rating diperlukan" },
+        { error: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+
+    const body = await request.json()
+    const { product_id, rating, comment } = body
+
+    if (!product_id || !rating) {
+      return NextResponse.json(
+        { error: "Product ID dan rating diperlukan" },
         { status: 400 }
       )
     }
@@ -94,18 +115,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // user_id diambil dari token, bukan dari body request
+    const { data: reviewer } = await supabase
+      .from('users')
+      .select('id')
+      .eq('student_id', decoded.username)
+      .single()
+
+    if (!reviewer) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+
     const { data, error } = await supabase
       .from('reviews')
       .insert({
         product_id,
-        user_id,
+        user_id: reviewer.id,
         rating,
         comment: comment || "",
       })
       .select()
 
     if (error) {
-      console.error("[Reviews POST] Error:", error)
+      console.error("[Reviews POST] Error:", error.message)
       return NextResponse.json(
         { error: "Gagal membuat review" },
         { status: 500 }

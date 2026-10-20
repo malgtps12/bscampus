@@ -1,30 +1,41 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { Product } from "@/lib/types";
+import { Product, Review } from "@/lib/types";
 import {
   ArrowLeft,
   Phone,
   Calendar,
   CheckCircle,
   MessageCircle,
+  Star,
 } from "lucide-react";
+
+interface ProductUser {
+  id: string;
+  name: string;
+  studentId: string;
+}
 
 export default function ProductDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<ProductUser | null>(null);
   const [creatingChat, setCreatingChat] = useState(false);
-
-  useEffect(() => {
-    fetchProduct();
-    checkAuth();
-  }, [params.id]);
+  const [saved, setSaved] = useState(false);
+  const [wishlistId, setWishlistId] = useState<string | null>(null);
+  const [buying, setBuying] = useState(false);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   const checkAuth = async () => {
     try {
@@ -40,7 +51,7 @@ export default function ProductDetailPage() {
 
   const handleChatPenjual = async () => {
     if (!user) {
-      window.location.href = "/login?redirect=/products/" + params.id;
+      router.push("/login?redirect=/products/" + params.id);
       return;
     }
 
@@ -67,7 +78,7 @@ export default function ProductDetailPage() {
       const data = await response.json();
 
       if (response.ok) {
-        window.location.href = `/chat/${data.id}`;
+        router.push(`/chat/${data.id}`);
       } else {
         alert(data.error || "Gagal membuat percakapan");
       }
@@ -91,6 +102,159 @@ export default function ProductDetailPage() {
       setLoading(false);
     }
   };
+
+  const fetchWishlistStatus = async () => {
+    try {
+      const response = await fetch("/api/wishlist");
+      if (!response.ok) return; // belum login - status wishlist hanya pelengkap
+      const rows: Array<{ id: string; product_id: string }> = await response.json();
+      const item = Array.isArray(rows)
+        ? rows.find((row) => row.product_id === params.id)
+        : undefined;
+      if (item) {
+        setSaved(true);
+        setWishlistId(item.id);
+      }
+    } catch {
+      // abaikan - kegagalan memuat status wishlist tidak kritis
+    }
+  };
+
+  const fetchReviews = async () => {
+    try {
+      const response = await fetch(`/api/reviews?product_id=${params.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data)) setReviews(data);
+      }
+    } catch (error) {
+      console.error("Error fetching reviews:", error);
+    }
+  };
+
+  const handleToggleWishlist = async () => {
+    if (!user) {
+      router.push("/login?redirect=/products/" + params.id);
+      return;
+    }
+
+    try {
+      if (saved && wishlistId) {
+        const response = await fetch(`/api/wishlist?id=${wishlistId}`, {
+          method: "DELETE",
+        });
+        if (response.ok) {
+          setSaved(false);
+          setWishlistId(null);
+        } else {
+          alert("Gagal menghapus dari wishlist");
+        }
+      } else {
+        const response = await fetch("/api/wishlist", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ product_id: params.id }),
+        });
+        const data = await response.json();
+        if (response.ok) {
+          setSaved(true);
+          setWishlistId(data.id);
+        } else if (response.status === 400) {
+          // Sudah ada di wishlist - muat ulang untuk mendapatkan ID barisnya
+          await fetchWishlistStatus();
+        } else {
+          alert(data.error || "Gagal menambahkan ke wishlist");
+        }
+      }
+    } catch {
+      alert("Terjadi kesalahan. Silakan coba lagi.");
+    }
+  };
+
+  const handleBeliSekarang = async () => {
+    if (!user) {
+      router.push("/login?redirect=/products/" + params.id);
+      return;
+    }
+    if (!product) return;
+
+    setBuying(true);
+    try {
+      // Harga tidak dikirim - server mengambilnya dari database
+      const response = await fetch("/api/waroengpay", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: product.id }),
+      });
+      const data = await response.json();
+
+      if (response.ok && data.data?.pay_url) {
+        // Navigasi penuh karena pay_url adalah halaman pembayaran eksternal
+        window.location.href = data.data.pay_url;
+      } else {
+        alert(data.error || "Gagal membuat tagihan pembayaran");
+      }
+    } catch {
+      alert("Terjadi kesalahan. Silakan coba lagi.");
+    } finally {
+      setBuying(false);
+    }
+  };
+
+  const handleSubmitReview = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!user) {
+      router.push("/login?redirect=/products/" + params.id);
+      return;
+    }
+    if (!product) return;
+
+    setSubmittingReview(true);
+    try {
+      const response = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_id: product.id,
+          rating: reviewRating,
+          comment: reviewComment.trim(),
+        }),
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        setReviewComment("");
+        // Muat ulang ulasan + rating produk (trigger DB menghitung ulang)
+        const [reviewsRes, productRes] = await Promise.all([
+          fetch(`/api/reviews?product_id=${product.id}`),
+          fetch(`/api/products/${product.id}`),
+        ]);
+        if (reviewsRes.ok) {
+          const reviewsData = await reviewsRes.json();
+          if (Array.isArray(reviewsData)) setReviews(reviewsData);
+        }
+        if (productRes.ok) {
+          setProduct(await productRes.json());
+        }
+      } else {
+        alert(data.error || "Gagal mengirim ulasan");
+      }
+    } catch {
+      alert("Terjadi kesalahan. Silakan coba lagi.");
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  useEffect(() => {
+    // Ambil data saat mount - semua setState terjadi setelah await (async)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchProduct();
+    checkAuth();
+    fetchWishlistStatus();
+    fetchReviews();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.id]);
 
   if (loading) {
     return (
@@ -144,9 +308,11 @@ export default function ProductDetailPage() {
           <div className="grid gap-8 lg:grid-cols-2">
             <div>
               <div className="relative aspect-square rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-900">
-                <img
+                <Image
                   src={product.images?.[0] || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&h=400"}
                   alt={product.title}
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 50vw"
                   className="h-full w-full object-cover"
                 />
                 <div className="absolute top-4 left-4">
@@ -168,9 +334,11 @@ export default function ProductDetailPage() {
                     key={i}
                     className="aspect-square rounded-lg bg-slate-100 dark:bg-slate-900 overflow-hidden cursor-pointer hover:opacity-80"
                   >
-                    <img
+                    <Image
                       src={product.images?.[0] || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&h=400"}
                       alt="Thumbnail"
+                      fill
+                      sizes="(max-width: 1024px) 33vw, 16vw"
                       className="h-full w-full object-cover"
                     />
                   </div>
@@ -249,11 +417,27 @@ export default function ProductDetailPage() {
               </div>
 
               <div className="flex gap-3">
-                <button className="flex-1 h-12 rounded-lg border border-slate-300 bg-white text-slate-900 font-semibold hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800">
-                  ♥ Simpan
+                <button
+                  onClick={handleToggleWishlist}
+                  aria-pressed={saved}
+                  className={`flex-1 h-12 rounded-lg border font-semibold transition-colors ${
+                    saved
+                      ? "border-red-300 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-950 dark:text-red-400"
+                      : "border-slate-300 bg-white text-slate-900 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  {saved ? "♥ Tersimpan" : "♥ Simpan"}
                 </button>
-                <button className="flex-1 h-12 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold hover:shadow-lg transition-shadow">
-                  Beli Sekarang
+                <button
+                  onClick={handleBeliSekarang}
+                  disabled={buying || product.sold}
+                  className="flex-1 h-12 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold hover:shadow-lg transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {product.sold
+                    ? "Sudah Terjual"
+                    : buying
+                      ? "Memproses..."
+                      : "Beli Sekarang"}
                 </button>
               </div>
 
@@ -268,6 +452,121 @@ export default function ProductDetailPage() {
                   })}
                 </p>
               </div>
+            </div>
+          </div>
+
+          <div className="mt-12 rounded-xl border border-slate-200 p-6 dark:border-slate-800">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-xl font-bold">Ulasan Pembeli</h2>
+              <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                <span className="font-semibold text-slate-900 dark:text-slate-100">
+                  {(product.rating ?? 0).toFixed(1)}
+                </span>
+                <span>({product.review_count ?? reviews.length} ulasan)</span>
+              </div>
+            </div>
+
+            {reviews.length === 0 ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Belum ada ulasan untuk produk ini.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {reviews.map((review) => (
+                  <div
+                    key={review.id}
+                    className="rounded-lg bg-slate-50 p-4 dark:bg-slate-900"
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold">{review.reviewer_name}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        {new Date(review.created_at).toLocaleDateString("id-ID", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </p>
+                    </div>
+                    <div
+                      className="mb-2 flex gap-0.5"
+                      aria-label={`Rating ${review.rating} dari 5`}
+                    >
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          className={`h-4 w-4 ${
+                            star <= review.rating
+                              ? "fill-amber-400 text-amber-400"
+                              : "text-slate-300 dark:text-slate-700"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    {review.comment && (
+                      <p className="text-sm text-slate-700 dark:text-slate-300">
+                        {review.comment}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-8 border-t border-slate-200 pt-6 dark:border-slate-800">
+              {user ? (
+                <form onSubmit={handleSubmitReview} className="space-y-4">
+                  <p className="font-semibold">Tulis Ulasan</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Rating:</span>
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setReviewRating(star)}
+                          aria-label={`Beri rating ${star}`}
+                          className="transition-transform hover:scale-110"
+                        >
+                          <Star
+                            className={`h-6 w-6 ${
+                              star <= reviewRating
+                                ? "fill-amber-400 text-amber-400"
+                                : "text-slate-300 dark:text-slate-600"
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <textarea
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    placeholder="Tulis ulasanmu tentang produk ini (opsional)"
+                    rows={3}
+                    maxLength={500}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                  <button
+                    type="submit"
+                    disabled={submittingReview}
+                    className="h-10 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {submittingReview ? "Mengirim..." : "Kirim Ulasan"}
+                  </button>
+                </form>
+              ) : (
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  <button
+                    type="button"
+                    onClick={() => router.push("/login?redirect=/products/" + params.id)}
+                    className="font-semibold text-blue-500 hover:underline"
+                  >
+                    Masuk
+                  </button>{" "}
+                  untuk menulis ulasan.
+                </p>
+              )}
             </div>
           </div>
         </div>

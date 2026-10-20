@@ -13,10 +13,6 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
   const fetchProducts = async () => {
     try {
       const response = await fetch("/api/products");
@@ -29,6 +25,12 @@ export default function Home() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // Ambil data saat mount - semua setState terjadi setelah await (async)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchProducts();
+  }, []);
 
   const filteredProducts =
     selectedCategory === "all"

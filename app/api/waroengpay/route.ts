@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { verifyJWT, verifyAdminJWT } from "@/lib/auth-utils"
 import { supabase } from "@/lib/supabase"
 
 export const runtime = 'nodejs'
@@ -52,31 +53,124 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json()
-    const { amount, productId, productName, userId, buyerId } = body
+    // Wajib login - identitas buyer diambil dari token, bukan dari body
+    const token = request.cookies.get("user_token")?.value
+    const decoded = token ? verifyJWT(token) : null
 
-    if (!amount || !productId || !userId) {
+    if (!decoded || decoded.role !== 'user') {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+
+    const body = await request.json()
+    const { productId } = body
+
+    if (!productId || typeof productId !== "string") {
       return NextResponse.json(
         { error: "Data tidak lengkap" },
         { status: 400 }
       )
     }
 
-    if (amount < 1000 || amount > 10000000) {
+    // Harga & data penjual diambil dari database - bukan dari body request,
+    // supaya pembeli tidak bisa memanipulasi nominal pembayaran.
+    const { data: product, error: productError } = await supabase
+      .from("products")
+      .select("id, title, price, sold, seller_name, seller_student_id")
+      .eq("id", productId)
+      .single()
+
+    if (productError || !product) {
       return NextResponse.json(
-        { error: "Jumlah harus antara Rp1.000 - Rp10.000.000" },
+        { error: "Produk tidak ditemukan" },
+        { status: 404 }
+      )
+    }
+
+    if (product.sold) {
+      return NextResponse.json(
+        { error: "Produk sudah terjual" },
+        { status: 400 }
+      )
+    }
+
+    if (product.seller_student_id === decoded.username) {
+      return NextResponse.json(
+        { error: "Tidak bisa membeli produk sendiri" },
+        { status: 400 }
+      )
+    }
+
+    const amount = Number(product.price)
+
+    if (!Number.isFinite(amount) || amount < 1000 || amount > 10000000) {
+      return NextResponse.json(
+        { error: "Harga produk harus antara Rp1.000 - Rp10.000.000" },
+        { status: 400 }
+      )
+    }
+
+    // Identitas pembeli dari token (student_id = username pada klaim JWT)
+    const { data: buyer, error: buyerError } = await supabase
+      .from("users")
+      .select("id, name")
+      .eq("student_id", decoded.username)
+      .single()
+
+    if (buyerError || !buyer) {
+      return NextResponse.json(
+        { error: "Akun pembeli tidak ditemukan" },
+        { status: 400 }
+      )
+    }
+
+    // Kolom transactions.seller_id adalah UUID - cari user penjual dari NIM
+    const { data: seller, error: sellerError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("student_id", product.seller_student_id)
+      .single()
+
+    if (sellerError || !seller) {
+      return NextResponse.json(
+        { error: "Akun penjual tidak ditemukan" },
         { status: 400 }
       )
     }
 
     const reference = generateUniqueReference(productId)
-    const description = `Pembayaran ${productName || 'Produk'}`
+    const description = `Pembayaran ${product.title}`
 
     const paymentData = await createPayment(amount, reference, description)
 
     if (!paymentData) {
       return NextResponse.json(
         { error: "Gagal membuat tagihan pembayaran" },
+        { status: 500 }
+      )
+    }
+
+    // Catat transaksi dengan payment_id - webhook WaroengPay mencocokkan
+    // event pembayaran lewat kolom ini (lihat /api/waroengpay/webhook).
+    const { error: insertError } = await supabase.from("transactions").insert({
+      product_id: product.id,
+      product_title: product.title,
+      seller_id: seller.id,
+      seller_name: product.seller_name,
+      seller_student_id: product.seller_student_id,
+      buyer_id: buyer.id,
+      buyer_name: buyer.name,
+      price: amount,
+      status: "pending",
+      payment_id: paymentData.id,
+    })
+
+    if (insertError) {
+      console.error("[WaroengPay] Insert transaction error:", insertError)
+      return NextResponse.json(
+        { error: "Gagal mencatat transaksi. Silakan coba lagi." },
         { status: 500 }
       )
     }
@@ -110,6 +204,18 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Listing pembayaran merchant = data sensitif, khusus admin
+    const authHeader = request.headers.get("authorization")
+    const bearerToken = authHeader?.split(" ")[1]
+    const cookieToken = request.cookies.get("admin_token")?.value
+
+    if (!verifyAdminJWT(bearerToken || cookieToken)) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const limit = parseInt(searchParams.get('limit') || '50')

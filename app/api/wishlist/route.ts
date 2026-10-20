@@ -1,13 +1,27 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
-import { checkApiRateLimit } from "@/lib/auth-utils"
+import { checkApiRateLimit, verifyJWT, getClientIp } from "@/lib/auth-utils"
 
 export const runtime = 'nodejs'
 
+async function getCurrentUserId(request: NextRequest): Promise<string | null> {
+  const token = request.cookies.get("user_token")?.value
+  const decoded = token ? verifyJWT(token) : null
+  if (!decoded) return null
+
+  const { data: user } = await supabase
+    .from('users')
+    .select('id')
+    .eq('student_id', decoded.username)
+    .single()
+
+  return user?.id ?? null
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
-    
+    const ip = getClientIp(request)
+
     if (!checkApiRateLimit(ip, 50)) {
       return NextResponse.json(
         { error: "Terlalu banyak permintaan. Coba lagi nanti." },
@@ -15,13 +29,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get("user_id")
+    // user_id diambil dari token - user hanya bisa melihat wishlist miliknya
+    const userId = await getCurrentUserId(request)
 
     if (!userId) {
       return NextResponse.json(
-        { error: "User ID diperlukan" },
-        { status: 400 }
+        { error: "Unauthorized" },
+        { status: 401 }
       )
     }
 
@@ -42,7 +56,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error("[Wishlist GET] Error:", error)
+      console.error("[Wishlist GET] Error:", error.message)
       return NextResponse.json(
         { error: "Gagal mengambil wishlist" },
         { status: 500 }
@@ -61,8 +75,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
-    
+    const ip = getClientIp(request)
+
     if (!checkApiRateLimit(ip, 30)) {
       return NextResponse.json(
         { error: "Terlalu banyak permintaan. Coba lagi nanti." },
@@ -70,12 +84,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body = await request.json()
-    const { user_id, product_id } = body
+    const userId = await getCurrentUserId(request)
 
-    if (!user_id || !product_id) {
+    if (!userId) {
       return NextResponse.json(
-        { error: "User ID dan Product ID diperlukan" },
+        { error: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+
+    const body = await request.json()
+    const { product_id } = body
+
+    if (!product_id) {
+      return NextResponse.json(
+        { error: "Product ID diperlukan" },
         { status: 400 }
       )
     }
@@ -83,9 +106,9 @@ export async function POST(request: NextRequest) {
     const { data: existing } = await supabase
       .from('wishlists')
       .select('id')
-      .eq('user_id', user_id)
+      .eq('user_id', userId)
       .eq('product_id', product_id)
-      .single()
+      .maybeSingle()
 
     if (existing) {
       return NextResponse.json(
@@ -97,13 +120,13 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('wishlists')
       .insert({
-        user_id,
+        user_id: userId,
         product_id,
       })
       .select()
 
     if (error) {
-      console.error("[Wishlist POST] Error:", error)
+      console.error("[Wishlist POST] Error:", error.message)
       return NextResponse.json(
         { error: "Gagal menambahkan ke wishlist" },
         { status: 500 }
@@ -122,12 +145,21 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
-    
+    const ip = getClientIp(request)
+
     if (!checkApiRateLimit(ip, 30)) {
       return NextResponse.json(
         { error: "Terlalu banyak permintaan. Coba lagi nanti." },
         { status: 429 }
+      )
+    }
+
+    const userId = await getCurrentUserId(request)
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
       )
     }
 
@@ -141,13 +173,15 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    // Hapus hanya jika baris wishlist milik user tersebut (cegah IDOR)
     const { error } = await supabase
       .from('wishlists')
       .delete()
       .eq('id', wishlistId)
+      .eq('user_id', userId)
 
     if (error) {
-      console.error("[Wishlist DELETE] Error:", error)
+      console.error("[Wishlist DELETE] Error:", error.message)
       return NextResponse.json(
         { error: "Gagal menghapus dari wishlist" },
         { status: 500 }

@@ -11,9 +11,9 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
     const apiKey = process.env.RESEND_API_KEY
     if (!apiKey) {
-      console.warn('[Resend] No API key configured. Email not sent.')
-      console.log(`To: ${options.to}, Subject: ${options.subject}`)
-      return true
+      // Jangan log isi email (bisa berisi kode reset) dan jangan berpura-pura sukses
+      console.error('[Resend] RESEND_API_KEY belum dikonfigurasi - email tidak terkirim')
+      return false
     }
 
     const resend = new Resend(apiKey)
@@ -114,90 +114,3 @@ Marketplace Mahasiswa Politeknik Negeri Lhokseumawe`
   })
 }
 
-export async function sendTransactionEmail(
-  email: string,
-  transactionId: string,
-  productTitle: string,
-  amount: number,
-  status: string
-): Promise<boolean> {
-  const formattedAmount = new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    minimumFractionDigits: 0
-  }).format(amount)
-
-  const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: #3b82f6; color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-    .content { background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; }
-    .footer { background: #f9fafb; padding: 20px; text-align: center; font-size: 12px; color: #6b7280; border-radius: 0 0 10px 10px; }
-    .status-box { padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center; font-weight: bold; }
-    .status-pending { background: #fef3c7; color: #92400e; border: 2px solid #f59e0b; }
-    .status-completed { background: #d1fae5; color: #065f46; border: 2px solid #10b981; }
-    .status-transferred { background: #e0e7ff; color: #3730a3; border: 2px solid #6366f1; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1 style="margin: 0;">BSCampus</h1>
-      <p style="margin: 10px 0 0 0;">Notifikasi Transaksi</p>
-    </div>
-    
-    <div class="content">
-      <p>Halo,</p>
-      
-      <p>Status transaksi Anda telah diperbarui:</p>
-      
-      <div>
-        <p><strong>ID Transaksi:</strong> ${transactionId}</p>
-        <p><strong>Produk:</strong> ${productTitle}</p>
-        <p><strong>Jumlah:</strong> ${formattedAmount}</p>
-      </div>
-      
-      <div class="status-box status-${status}">
-        Status: ${status}
-      </div>
-      
-      <p>Silakan login ke akun BSCampus Anda untuk melihat detail lengkap transaksi.</p>
-    </div>
-    
-    <div class="footer">
-      <p><strong>Tim BSCampus</strong></p>
-      <p>Marketplace Mahasiswa Politeknik Negeri Lhokseumawe</p>
-      <p style="margin-top: 10px;">Email otomatis - Jangan balas email ini</p>
-    </div>
-  </div>
-</body>
-</html>
-`
-
-  const text = `Notifikasi Transaksi BSCampus
-
-Status transaksi Anda telah diperbarui:
-
-ID Transaksi: ${transactionId}
-Produk: ${productTitle}
-Jumlah: ${formattedAmount}
-Status: ${status}
-
-Silakan login ke akun BSCampus Anda untuk melihat detail lengkap transaksi.
-
----
-Tim BSCampus
-Marketplace Mahasiswa Politeknik Negeri Lhokseumawe`
-
-  return await sendEmail({
-    to: email,
-    subject: 'Notifikasi Transaksi - BSCampus',
-    text: text,
-    html: html
-  })
-}

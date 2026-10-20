@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
-import { validateInput, checkRateLimit, generateJWT } from "@/lib/auth-utils"
+import {
+  validateInput,
+  validatePasswordLength,
+  checkRateLimit,
+  generateJWT,
+  getClientIp,
+} from "@/lib/auth-utils"
 import bcrypt from "bcryptjs"
 
 export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
-    
+    const ip = getClientIp(request)
+
     if (!checkRateLimit(ip)) {
       return NextResponse.json(
         { error: "Terlalu banyak percobaan login. Coba lagi nanti." },
@@ -26,7 +32,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!validateInput(studentId) || !validateInput(password)) {
+    if (!validateInput(studentId) || !validatePasswordLength(password)) {
       return NextResponse.json(
         { error: "Input tidak valid" },
         { status: 400 }
@@ -63,7 +69,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const token = generateJWT(user.student_id)
+    const token = generateJWT(user.student_id, "user")
 
     const response = NextResponse.json(
       { 

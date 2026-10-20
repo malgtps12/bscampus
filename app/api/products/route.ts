@@ -13,13 +13,13 @@ export async function GET() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("[DEBUG] Error fetching products:", error);
+      console.error("[Products GET] Error:", error.message);
       throw error;
     }
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error("[DEBUG] Error in GET /api/products:", error);
+    console.error("[Products GET] Error:", error);
     return NextResponse.json(
       { error: "Failed to fetch products" },
       { status: 500 }
@@ -48,32 +48,49 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    
-    console.log("[DEBUG] Received payload:", JSON.stringify(body, null, 2));
 
-    if (!body.title || !body.price || !body.seller_name) {
+    if (!body.title || !body.price) {
       return NextResponse.json(
-        { error: "Data tidak lengkap: title, price, dan seller_name wajib diisi", body },
+        { error: "Data tidak lengkap: title dan price wajib diisi" },
+        { status: 400 }
+      );
+    }
+
+    const price = Number.parseInt(String(body.price), 10);
+    if (!Number.isFinite(price) || price < 0) {
+      return NextResponse.json(
+        { error: "Harga tidak valid" },
         { status: 400 }
       );
     }
 
     const supabase = await createClient();
-    console.log("[DEBUG] Supabase client created");
+
+    // Identitas penjual diambil dari token, bukan dari body request
+    const { data: seller } = await supabase
+      .from("users")
+      .select("name, phone")
+      .eq("student_id", decoded.username)
+      .single();
+
+    if (!seller) {
+      return NextResponse.json(
+        { error: "Token tidak valid. Silakan login kembali" },
+        { status: 401 }
+      );
+    }
 
     const productData = {
       title: body.title,
       description: body.description || "",
-      price: parseInt(body.price),
+      price,
       category: body.category || "lainnya",
       condition: body.condition || "bekas",
-      seller_name: body.seller_name,
-      seller_student_id: body.seller_student_id,
-      seller_contact: body.seller_contact,
+      seller_name: seller.name,
+      seller_student_id: decoded.username,
+      seller_contact: seller.phone || "",
       images: body.images || [],
     };
-
-    console.log("[DEBUG] Inserting to Supabase:", JSON.stringify(productData, null, 2));
 
     const { data, error } = await supabase
       .from("products")
@@ -81,27 +98,19 @@ export async function POST(request: NextRequest) {
       .select();
 
     if (error) {
-      console.error("[DEBUG] Supabase error:", error);
+      console.error("[Products POST] Insert error:", error.message);
       return NextResponse.json(
-        { 
-          error: "Database error", 
-          details: error.message,
-          hint: "Pastikan table 'products' sudah dibuat di Supabase"
-        },
+        { error: "Gagal menyimpan produk. Silakan coba lagi." },
         { status: 500 }
       );
     }
 
-    console.log("[DEBUG] Product created successfully:", JSON.stringify(data, null, 2));
     return NextResponse.json(data[0], { status: 201 });
   } catch (error) {
-    console.error("[DEBUG] Error creating product:", error);
-    
+    console.error("[Products POST] Error:", error);
+
     return NextResponse.json(
-      { 
-        error: "Server error", 
-        details: error instanceof Error ? error.message : String(error)
-      },
+      { error: "Server error" },
       { status: 500 }
     );
   }

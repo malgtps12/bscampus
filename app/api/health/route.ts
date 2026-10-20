@@ -1,25 +1,30 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
 
 export const runtime = 'nodejs'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const startTime = Date.now()
 
-    const { data: dbCheck } = await supabase
+    const { error: dbError } = await supabase
       .from('products')
       .select('id', { count: 'exact', head: true })
 
     const dbLatency = Date.now() - startTime
+    const dbConnected = !dbError
+
+    if (dbError) {
+      console.error("[Health Check] Database error:", dbError.message)
+    }
 
     const health = {
-      status: "healthy",
+      status: dbConnected ? "healthy" : "degraded",
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: process.env.NODE_ENV,
       database: {
-        connected: dbCheck !== null || dbCheck !== undefined,
+        connected: dbConnected,
         latency: `${dbLatency}ms`,
       },
       memory: {
@@ -27,12 +32,12 @@ export async function GET(request: NextRequest) {
         total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
       },
       services: {
-        supabase: dbLatency < 5000 ? "operational" : "degraded",
+        supabase: dbConnected && dbLatency < 5000 ? "operational" : "degraded",
         api: "operational",
       },
     }
 
-    return NextResponse.json(health, { status: 200 })
+    return NextResponse.json(health, { status: dbConnected ? 200 : 503 })
   } catch (error) {
     console.error("[Health Check] Error:", error)
     return NextResponse.json(

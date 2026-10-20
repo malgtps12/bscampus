@@ -1,4 +1,4 @@
-import { categories } from "@/lib/mockData";
+import { categories } from "@/lib/categories";
 
 interface CategoryFilterProps {
   selectedCategory: string;

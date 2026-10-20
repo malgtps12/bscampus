@@ -1,20 +1,13 @@
-# Fitur Reset Password 6-Digit dengan MongoDB + Nodemailer
+# Fitur Reset Password 6-Digit dengan Supabase + Resend
 
 ## 📦 Package yang Harus Di-install
 
 ```bash
-# MongoDB & Mongoose
-npm install mongoose
-
-# Email dengan Nodemailer
-npm install nodemailer
-npm install @types/nodemailer --save-dev
-
-# Rate Limiting
-npm install rate-limiter-flexible
-
 # Sudah ada di project:
-# - bcryptjs (untuk password hashing)
+# - @supabase/supabase-js (database: tabel users + password_reset_codes)
+# - resend (pengiriman email transaksional)
+# - rate-limiter-flexible (rate limiting per IP)
+# - bcryptjs (hash password & hash kode reset)
 ```
 
 ---
@@ -23,19 +16,18 @@ npm install rate-limiter-flexible
 
 ```
 bscampus/
-├── models/
-│   ├── User.ts                 # Model user MongoDB
-│   └── ResetPassword.ts        # Model kode reset dengan TTL
 ├── lib/
-│   ├── mongodb.ts              # Koneksi MongoDB
 │   ├── reset-password-helper.ts # Helper generate & verify kode
-│   └── email-service.ts        # Nodemailer service
+│   ├── reset-password.ts        # Validasi format email/ kode / password
+│   └── email.ts                 # Kirim email via Resend (sendResetCodeEmail)
 ├── services/
-│   └── reset-password-service.ts # Business logic & rate limiting
+│   └── reset-password-service.ts # Business logic & rate limiting (Supabase)
+├── migrations/
+│   └── 001_add_password_reset.sql # Tabel password_reset_codes (jalankan di SQL Editor)
 ├── app/
-│   ├── api/auth/forgot-password/secure-route.ts  # POST kirim kode
-│   ├── api/auth/reset-password/secure-route.ts   # POST reset password
-│   └── auth/secure-forgot-password/page.tsx      # Frontend React
+│   ├── api/auth/forgot-password/route.ts  # POST kirim kode
+│   ├── api/auth/reset-password/route.ts   # POST reset password
+│   └── forgot-password/page.tsx           # Frontend React
 ```
 
 ---
@@ -43,20 +35,17 @@ bscampus/
 ## ⚙️ Setup Environment Variables
 
 ```env
-# MongoDB
-MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/bscampus
+# Supabase (sudah dipakai untuk login/register)
+NEXT_PUBLIC_SUPABASE_URL=your-project-url
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-anon-key
 
-# SMTP untuk Nodemailer (Gmail example)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
+# Resend untuk kirim email (lihat RESEND_SETUP.md)
+RESEND_API_KEY=re_xxxxxxxx
+RESEND_FROM_EMAIL=BSCampus <onboarding@resend.dev>
 ```
 
-### Gmail App Password:
-1. Buka https://myaccount.google.com/apppasswords
-2. Generate App Password baru
-3. Copy 16 karakter sebagai SMTP_PASSWORD
+> Migration `migrations/001_add_password_reset.sql` harus dijalankan sekali
+> di Supabase SQL Editor untuk membuat tabel `password_reset_codes`.
 
 ---
 
@@ -129,10 +118,10 @@ curl -X POST http://localhost:3000/api/auth/reset-password \
 - Hash dengan bcrypt salt rounds 10
 - Verifikasi dengan bcrypt.compare()
 
-### 3. **TTL Index (10 menit)**
-- MongoDB otomatis hapus document setelah 600 detik
-- `expires: 600` di schema + `expireAfterSeconds: 600`
-- Tidak perlu cron job manual
+### 3. **Masa Berlaku Kode (10 menit)**
+- `expires_at` disimpan di tabel `password_reset_codes`
+- Lewat 10 menit → kode dianggap kadaluarsa & dibuang
+- Tidak perlu cron job manual (dicek saat verifikasi)
 
 ### 4. **Batas 5x Percobaan**
 - Setiap kode salah → attempts +1
@@ -175,7 +164,7 @@ curl -X POST http://localhost:3000/api/auth/reset-password \
 npm run dev
 
 # 2. Buka halaman
-http://localhost:3000/auth/secure-forgot-password
+http://localhost:3000/forgot-password
 
 # 3. Test flow:
 # - Input email → kirim kode

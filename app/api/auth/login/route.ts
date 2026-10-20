@@ -1,21 +1,43 @@
+import crypto from "node:crypto"
 import { NextRequest, NextResponse } from "next/server"
 import {
   validateInput,
-  checkRateLimit,
+  validatePasswordLength,
+  checkAdminRateLimit,
   generateJWT,
+  getClientIp,
 } from "@/lib/auth-utils"
 
 export const runtime = 'nodejs'
 
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "MXLERA"
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "2026583020043"
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD
+
+function safeEqual(a: string, b: string): boolean {
+  const bufferA = Buffer.from(a)
+  const bufferB = Buffer.from(b)
+  if (bufferA.length !== bufferB.length) {
+    // Tetap lakukan perbandingan supaya durasi tidak membocorkan panjang password
+    crypto.timingSafeEqual(bufferA, bufferA)
+    return false
+  }
+  return crypto.timingSafeEqual(bufferA, bufferB)
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
-    
-    if (!checkRateLimit(ip)) {
-      console.warn(`[Security] Rate limit exceeded for IP: ${ip}`)
+    if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
+      console.error("[Security] ADMIN_USERNAME / ADMIN_PASSWORD belum di-set di environment")
+      return NextResponse.json(
+        { error: "Login admin belum dikonfigurasi di server." },
+        { status: 503 }
+      )
+    }
+
+    const ip = getClientIp(request)
+
+    if (!checkAdminRateLimit(ip)) {
+      console.warn(`[Security] Rate limit admin login exceeded for IP: ${ip}`)
       return NextResponse.json(
         { error: "Terlalu banyak percobaan login. Coba lagi nanti." },
         { status: 429 }
@@ -32,7 +54,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!validateInput(username) || !validateInput(password)) {
+    if (!validateInput(username) || !validatePasswordLength(password)) {
       console.warn(`[Security] Invalid input detected for IP: ${ip}`)
       return NextResponse.json(
         { error: "Input tidak valid" },
@@ -40,23 +62,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (username.trim() !== ADMIN_USERNAME) {
-      console.warn(`[Security] Failed login attempt - invalid username from IP: ${ip}`)
+    const usernameMatches = safeEqual(username.trim(), ADMIN_USERNAME)
+    const passwordMatches = safeEqual(password, ADMIN_PASSWORD)
+
+    if (!usernameMatches || !passwordMatches) {
+      console.warn(`[Security] Failed admin login attempt from IP: ${ip}`)
       return NextResponse.json(
         { error: "Username atau password salah" },
         { status: 401 }
       )
     }
 
-    if (password !== ADMIN_PASSWORD) {
-      console.warn(`[Security] Failed login attempt - invalid password from IP: ${ip}`)
-      return NextResponse.json(
-        { error: "Username atau password salah" },
-        { status: 401 }
-      )
-    }
-
-    const token = generateJWT(username)
+    const token = generateJWT(ADMIN_USERNAME, "admin")
 
     const response = NextResponse.json(
       { success: true, token },

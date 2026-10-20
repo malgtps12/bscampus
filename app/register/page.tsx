@@ -55,7 +55,7 @@ export default function RegisterPage() {
       } else {
         setError(data.error || 'Registrasi gagal')
       }
-    } catch (err) {
+    } catch {
       setError('Terjadi kesalahan. Silakan coba lagi.')
     } finally {
       setLoading(false)

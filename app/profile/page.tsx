@@ -4,9 +4,24 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
+interface ProfileUser {
+  id: string
+  name: string
+  studentId: string
+  email: string
+  phone: string
+  campus: string
+  bankName?: string
+  accountNumber?: string
+  accountHolderName?: string
+  ewalletType?: string
+  ewalletNumber?: string
+  createdAt?: string
+}
+
 export default function ProfilePage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<ProfileUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -21,10 +36,6 @@ export default function ProfilePage() {
     ewalletType: '',
     ewalletNumber: ''
   })
-
-  useEffect(() => {
-    fetchUser()
-  }, [])
 
   const fetchUser = async () => {
     try {
@@ -46,12 +57,18 @@ export default function ProfilePage() {
         ewalletType: data.user.ewalletType || '',
         ewalletNumber: data.user.ewalletNumber || ''
       })
-    } catch (err) {
+    } catch {
       router.push('/login')
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchUser()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -79,7 +96,7 @@ export default function ProfilePage() {
       } else {
         setError(data.error || 'Gagal memperbarui profil')
       }
-    } catch (err) {
+    } catch {
       setError('Terjadi kesalahan. Silakan coba lagi.')
     } finally {
       setSaving(false)

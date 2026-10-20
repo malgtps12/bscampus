@@ -14,6 +14,20 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // Selalu lewatkan ke network (tanpa cache):
+  // - request non-GET (POST/PUT/DELETE)
+  // - API (/api/*) supaya data transaksi/chat tidak pernah basi
+  // - request lintas origin (CDN gambar, dsb.)
+  if (
+    event.request.method !== 'GET' ||
+    url.pathname.startsWith('/api/') ||
+    url.origin !== self.location.origin
+  ) {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {

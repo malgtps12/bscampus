@@ -18,13 +18,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ user: null }, { status: 401 })
     }
 
+    // Pilih semua kolom lalu petakan dengan fallback null - jangan mendaftarkan
+    // kolom opsional secara eksplisit. Jika kolom opsional (rekening bank/dompet
+    // digital) belum ada di database, query ikut gagal dan user yang sudah login
+    // justru dianggap 401 (dulu menyebabkan loop login -> halaman -> login).
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, name, student_id, email, phone, campus, bank_name, account_number, account_holder_name, ewallet_type, ewallet_number, created_at')
+      .select('*')
       .eq('student_id', decoded.username)
       .single()
 
     if (error || !user) {
+      console.error('[Auth Me] User query error:', error?.message)
       return NextResponse.json({ user: null }, { status: 401 })
     }
 
@@ -36,11 +41,11 @@ export async function GET(request: NextRequest) {
         email: user.email,
         phone: user.phone,
         campus: user.campus,
-        bankName: user.bank_name,
-        accountNumber: user.account_number,
-        accountHolderName: user.account_holder_name,
-        ewalletType: user.ewallet_type,
-        ewalletNumber: user.ewallet_number,
+        bankName: user.bank_name ?? null,
+        accountNumber: user.account_number ?? null,
+        accountHolderName: user.account_holder_name ?? null,
+        ewalletType: user.ewallet_type ?? null,
+        ewalletNumber: user.ewallet_number ?? null,
         createdAt: user.created_at
       }
     })

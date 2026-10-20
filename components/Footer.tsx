@@ -27,24 +27,24 @@ export function Footer() {
             <h3 className="font-semibold mb-4">Kategori</h3>
             <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
               <li>
-                <a href="/products?category=elektronik" className="hover:text-blue-500">
+                <Link href="/products?category=elektronik" className="hover:text-blue-500">
                   Elektronik
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/products?category=buku" className="hover:text-blue-500">
+                <Link href="/products?category=buku" className="hover:text-blue-500">
                   Buku & Alat Tulis
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/products?category=furniture" className="hover:text-blue-500">
+                <Link href="/products?category=furniture" className="hover:text-blue-500">
                   Furniture
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/products?category=fashion" className="hover:text-blue-500">
+                <Link href="/products?category=fashion" className="hover:text-blue-500">
                   Fashion
-                </a>
+                </Link>
               </li>
             </ul>
           </div>

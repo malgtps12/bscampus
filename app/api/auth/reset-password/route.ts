@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     
     // Reset password service
     const result = await resetPasswordService(
-      email.toLowerCase(),
+      email.trim(),
       code,
       newPassword
     )
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       message: 'Password berhasil direset. Silakan login dengan password baru.'
     })
     
-  } catch (error: any) {
+  } catch (error) {
     console.error('[Reset Password] Error:', error)
     return NextResponse.json(
       { error: 'Terjadi kesalahan internal. Silakan coba lagi.' },

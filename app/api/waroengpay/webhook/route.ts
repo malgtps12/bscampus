@@ -18,6 +18,25 @@ function verifySignature(timestamp: string, body: string, signature: string): bo
          crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))
 }
 
+/** Audit trail non-blocking - kegagalan insert tidak mempengaruhi respons webhook. */
+async function logWebhookEvent(event: Record<string, unknown>): Promise<void> {
+  try {
+    const data = (event.data ?? {}) as Record<string, unknown>
+    await supabase.from('webhook_logs').insert({
+      event: String(event.event ?? 'unknown'),
+      payment_id: String(data.id ?? ''),
+      status: 'received',
+      amount: Number(data.base_amount ?? data.amount ?? 0),
+      reference: String(data.reference ?? ''),
+      verified: true,
+      livemode: event.livemode !== false,
+      raw_data: event,
+    })
+  } catch (error) {
+    console.error('[WaroengPay Webhook] Failed to write log:', error)
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text()
@@ -25,11 +44,11 @@ export async function POST(request: NextRequest) {
     const signature = request.headers.get('x-signature') || ''
 
     const currentTime = Math.floor(Date.now() / 1000)
-    const requestTime = parseInt(timestamp)
-    const timeDiff = Math.abs(currentTime - requestTime)
+    const requestTime = Number.parseInt(timestamp, 10)
 
-    if (timeDiff > 300) {
-      console.error('[WaroengPay Webhook] Timestamp too old or future')
+    // Number.isFinite menangkap header timestamp hilang (NaN) - sebelumnya lolos
+    if (!Number.isFinite(requestTime) || Math.abs(currentTime - requestTime) > 300) {
+      console.error('[WaroengPay Webhook] Timestamp too old, future, or missing')
       return NextResponse.json({ error: 'Invalid timestamp' }, { status: 401 })
     }
 
@@ -39,6 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     const event = JSON.parse(body)
+    await logWebhookEvent(event)
 
     if (event.livemode === false) {
       console.log('[WaroengPay Webhook] Test mode event - ignoring')
@@ -71,6 +91,12 @@ export async function POST(request: NextRequest) {
           expected: transaction.price,
           received: paymentData.base_amount
         })
+        return NextResponse.json({ received: true }, { status: 200 })
+      }
+
+      // Idempotency: event retry tidak boleh memproses ulang
+      if (transaction.status === 'paid') {
+        console.log('[WaroengPay Webhook] Transaction already paid, skipping:', transaction.id)
         return NextResponse.json({ received: true }, { status: 200 })
       }
 
