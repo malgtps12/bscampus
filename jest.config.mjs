@@ -1,11 +1,14 @@
-import type { Config } from 'jest'
+// Konfigurasi Jest (ESM). Sengaja memakai .mjs, bukan .ts, supaya bisa dibaca
+// Jest tanpa `ts-node`. Versi .ts sebelumnya gagal di CI dengan error
+// "Jest: 'ts-node' is required for the TypeScript configuration files".
 import nextJest from 'next/jest.js'
 
 const createJestConfig = nextJest({
   dir: './',
 })
 
-const config: Config = {
+/** @type {import('jest').Config} */
+const config = {
   coverageProvider: 'v8',
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],

@@ -16,7 +16,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies
@@ -26,16 +26,7 @@ jobs:
         run: npm run lint
 
       - name: Test
-        run: |
-          echo "NODE_ENV=$NODE_ENV"
-          echo "node: $(node -v) | npm: $(npm -v)"
-          echo "--- isi node_modules/.bin (jest*) ---"
-          ls node_modules/.bin | grep -i jest || echo "TIDAK ADA jest di .bin"
-          echo "--- jalankan jest langsung ---"
-          npx jest 2>&1 | tail -40
-          echo "jest-exit=${PIPESTATUS[0]}"
-          echo "--- jalankan npm test ---"
-          npm test
+        run: npm test
 
       - name: Build
         run: npm run build
@@ -52,8 +43,8 @@ jobs:
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           vercel-args: '--prod'
         env:
-          # Secret dummy khusus CI. Hanya dipakai `next build` (tidak ada
-          # koneksi runtime), supaya build tidak gagal saat JWT_SECRET kosong.
+          # Secret dummy khusus CI. Hanya dipakai saat `next build`
+          # (tidak ada koneksi runtime dari runner CI).
           JWT_SECRET: ci-dummy-jwt-secret-not-used-at-runtime
           ADMIN_USERNAME: ci-dummy-admin
           ADMIN_PASSWORD: ci-dummy-password
