@@ -42,3 +42,9 @@ jobs:
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           vercel-args: '--prod'
+        env:
+          # Secret dummy khusus CI. Hanya dipakai `next build` (tidak ada
+          # koneksi runtime), supaya build tidak gagal saat JWT_SECRET kosong.
+          JWT_SECRET: ci-dummy-jwt-secret-not-used-at-runtime
+          ADMIN_USERNAME: ci-dummy-admin
+          ADMIN_PASSWORD: ci-dummy-password
