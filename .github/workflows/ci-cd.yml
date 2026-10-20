@@ -26,7 +26,13 @@ jobs:
         run: npm run lint
 
       - name: Test
-        run: npm test
+        run: |
+          echo "NODE_ENV=$NODE_ENV"
+          echo "node: $(node -v) | npm: $(npm -v)"
+          echo "--- isi node_modules/.bin (jest*) ---"
+          ls node_modules/.bin | grep -i jest || echo "TIDAK ADA jest di .bin"
+
+          npm test
 
       - name: Build
         run: npm run build
