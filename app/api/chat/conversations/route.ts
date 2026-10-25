@@ -37,8 +37,7 @@ export async function GET(request: NextRequest) {
       .select(`
         *,
         buyer:buyer_id(id, name, student_id),
-        seller:seller_id(id, name, student_id),
-        product:product_id(id, title, images)
+        seller:seller_id(id, name, student_id)
       `)
       .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
       .order('updated_at', { ascending: false })
@@ -48,7 +47,33 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json(conversations)
+    // conversations.product_id tidak punya foreign key ke products, sehingga
+    // embed `product:product_id(...)` ditolak PostgREST (PGRST200) dan seluruh
+    // endpoint gagal -> daftar chat selalu kosong. Ambil produk terpisah lalu
+    // gabungkan di sini.
+    const rows = conversations ?? []
+    const productIds = [...new Set(rows.map((c) => c.product_id).filter(Boolean))]
+    let productsById = new Map<string, { id: string; title: string; images: string[] }>()
+
+    if (productIds.length > 0) {
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('id, title, images')
+        .in('id', productIds)
+
+      if (productsError) {
+        console.error("[Get Conversations] Product lookup error:", productsError.message)
+      } else {
+        productsById = new Map((products ?? []).map((p) => [p.id, p]))
+      }
+    }
+
+    const result = rows.map((conversation) => ({
+      ...conversation,
+      product: productsById.get(conversation.product_id) ?? null,
+    }))
+
+    return NextResponse.json(result)
   } catch (error) {
     console.error("[Get Conversations] Error:", error)
     return NextResponse.json(

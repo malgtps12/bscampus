@@ -7,6 +7,7 @@ import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { MessageCircle } from 'lucide-react'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
 
 interface Conversation {
   id: string
@@ -46,7 +47,9 @@ export default function ChatListPage() {
 
   const fetchConversations = async () => {
     try {
-      const response = await fetch('/api/chat/conversations')
+      const response = await fetch('/api/chat/conversations', {
+        cache: 'no-store',
+      })
       if (response.ok) {
         const data = await response.json()
         setConversations(data)
@@ -80,6 +83,34 @@ export default function ChatListPage() {
     checkAuth()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Realtime: percakapan baru atau pesan terakhir berubah -> muat ulang daftar.
+  // Polling 10 detik tetap dipakai sebagai fallback jika Realtime belum aktif
+  // di project Supabase (tabel belum masuk publication supabase_realtime).
+  useEffect(() => {
+    if (!user) return
+
+    const channel = supabase
+      .channel(`chat-list-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'conversations', filter: `buyer_id=eq.${user.id}` },
+        () => { fetchConversations() }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'conversations', filter: `seller_id=eq.${user.id}` },
+        () => { fetchConversations() }
+      )
+      .subscribe()
+
+    const interval = setInterval(fetchConversations, 10000)
+
+    return () => {
+      clearInterval(interval)
+      supabase.removeChannel(channel)
+    }
+  }, [user])
 
   if (loading) {
     return (
@@ -126,8 +157,8 @@ export default function ChatListPage() {
                     <div className="flex gap-4">
                       <div className="flex-shrink-0">
                         <Image
-                          src={conv.product.images?.[0] || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&h=400'}
-                          alt={conv.product.title}
+                          src={conv.product?.images?.[0] || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&h=400'}
+                          alt={conv.product?.title || 'Produk'}
                           width={80}
                           height={80}
                           className="w-20 h-20 object-cover rounded-lg"
@@ -135,7 +166,7 @@ export default function ChatListPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-sm mb-1 truncate">
-                          {conv.product.title}
+                          {conv.product?.title || 'Produk tidak tersedia'}
                         </h3>
                         <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
                           {isBuyer ? 'Penjual' : 'Pembeli'}: {otherUser.name}

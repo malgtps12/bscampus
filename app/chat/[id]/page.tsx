@@ -6,6 +6,7 @@ import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { ArrowLeft, Send } from 'lucide-react'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
 
 interface Message {
   id: string
@@ -57,7 +58,9 @@ export default function ChatRoomPage() {
 
   const fetchMessages = async () => {
     try {
-      const response = await fetch(`/api/chat/conversations/${params.id}`)
+      const response = await fetch(`/api/chat/conversations/${params.id}`, {
+        cache: 'no-store',
+      })
       if (response.ok) {
         const data = await response.json()
         setMessages(data)
@@ -73,8 +76,32 @@ export default function ChatRoomPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     checkAuth()
     fetchMessages()
-    const interval = setInterval(fetchMessages, 3000)
+    // Fallback polling; pesan baru tetap masuk instan lewat Realtime di bawah.
+    const interval = setInterval(fetchMessages, 5000)
     return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.id])
+
+  // Realtime: setiap pesan baru pada percakapan ini langsung memicu refetch.
+  // Refetch dipakai supaya relasi sender (nama & NIM) tetap ikut.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`chat-room-${params.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${params.id}`,
+        },
+        () => { fetchMessages() }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id])
 
@@ -129,7 +156,7 @@ export default function ChatRoomPage() {
                 <ArrowLeft className="h-5 w-5" />
                 Kembali ke Daftar Chat
               </Link>
-              <h1 className="text-xl font-bold">Chat dengan Penjual</h1>
+              <h1 className="text-xl font-bold">Chat</h1>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
