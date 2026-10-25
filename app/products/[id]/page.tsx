@@ -189,8 +189,25 @@ export default function ProductDetailPage() {
       const data = await response.json();
 
       if (response.ok && data.data?.pay_url) {
-        // Navigasi penuh karena pay_url adalah halaman pembayaran eksternal
-        window.location.href = data.data.pay_url;
+        // Simpan data tagihan supaya halaman tunggu bisa menampilkan QRIS
+        // dan polling status tanpa round-trip tambahan.
+        try {
+          sessionStorage.setItem(
+            "waroengpay:" + data.data.id,
+            JSON.stringify(data.data)
+          );
+        } catch {
+          // sessionStorage penuh/disabled - halaman tunggu tetap jalan via polling
+        }
+        // Navigasi ke halaman tunggu lokal; QRIS & link bayar
+        // ditampilkan di sana.
+        router.push(
+          `/transactions/success?payment_id=${encodeURIComponent(
+            data.data.id
+          )}&reference=${encodeURIComponent(
+            data.data.reference
+          )}&pay_url=${encodeURIComponent(data.data.pay_url)}`
+        );
       } else {
         alert(data.error || "Gagal membuat tagihan pembayaran");
       }
