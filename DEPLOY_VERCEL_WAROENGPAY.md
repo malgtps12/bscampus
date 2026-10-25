@@ -61,9 +61,10 @@ Kalau domain Vercel berbeda dari yang Anda isi di langkah 2:
 
 1. Login https://waroengpay.com/dashboard
 2. **Integrasi & API** → **Webhook**
-3. Isi URL webhook:
+3. Isi URL webhook (pilih salah satu, keduanya aktif):
    ```
    https://<project>.vercel.app/api/waroengpay/webhook
+   https://<project>.vercel.app/webhook/waroengpay
    ```
 4. Masukkan password akun untuk menampilkan **webhook secret**
 5. Pastikan secret itu sama dengan `WAROENGPAY_WEBHOOK_SECRET` di Vercel

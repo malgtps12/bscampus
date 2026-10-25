@@ -32,13 +32,18 @@ BSCampus mengintegrasikan WaroengPay sebagai payment gateway untuk QRIS dinamis.
 
 ### 3. Setup Webhook URL
 1. Dashboard → Integrasi & API → Webhook
-2. Atur URL webhook:
+2. Atur URL webhook (pilih salah satu — keduanya memakai handler yang sama):
    ```
-   https://yourdomain.com/api/waroengpay/webhook
+   https://yourdomain.com/api/waroengpay/webhook   (kanonik)
+   https://yourdomain.com/webhook/waroengpay       (alias singkat)
    ```
    (Development: gunakan `ngrok` atau tunnel service lain)
 
 3. Port yang didukung: 80, 443, 8080, 8443
+
+Kedua path menerima `POST` dengan verifikasi yang identik (lihat
+`lib/waroengpay-webhook.ts`). `GET` pada keduanya hanya health check
+(`{"endpoint":"waroengpay-webhook","method":"POST","status":"ready"}`).
 
 > ⚠️ **WaroengPay menolak callback ke jaringan privat** (`localhost`, `10.x`,
 > `192.168.x`). Di development lokal webhook tidak akan pernah sampai; status
@@ -79,7 +84,18 @@ Sistem secara otomatis menerima notifikasi pembayaran:
 - `payment.expired` - Tagihan kadaluarsa
 - `payment.cancelled` - Pembayaran dibatalkan
 
-Setiap webhook diverifikasi dengan HMAC-SHA256.
+Endpoint penerima (dua-duanya aktif, handler sama):
+
+| Method | Path | Keterangan |
+|---|---|---|
+| `POST` | `/api/waroengpay/webhook` | path kanonik, dipakai `callback_url` |
+| `POST` | `/webhook/waroengpay` | alias singkat |
+| `GET` | keduanya | health check |
+
+Setiap webhook diverifikasi dengan HMAC-SHA256 atas
+`"<X-WaroengPay-Timestamp>.<raw body>"`, dengan toleransi umur 300 detik.
+Event `livemode: false` (sandbox) dicatat ke `webhook_logs` tetapi tidak
+mengubah data transaksi.
 
 ## Testing (Mode Uji/Sandbox)
 
