@@ -40,6 +40,11 @@ BSCampus mengintegrasikan WaroengPay sebagai payment gateway untuk QRIS dinamis.
 
 3. Port yang didukung: 80, 443, 8080, 8443
 
+> ⚠️ **WaroengPay menolak callback ke jaringan privat** (`localhost`, `10.x`,
+> `192.168.x`). Di development lokal webhook tidak akan pernah sampai; status
+> pembayaran tetap sinkron lewat polling `GET /api/waroengpay/[id]`.
+> Panduan deploy lengkap: lihat `DEPLOY_VERCEL_WAROENGPAY.md`.
+
 ### 4. Update .env.local
 ```env
 # WaroengPay Configuration
@@ -123,13 +128,12 @@ POST /api/waroengpay
 Request:
 ```json
 {
-  "amount": 50000,
-  "productId": "product-uuid",
-  "productName": "Laptop ASUS",
-  "userId": "buyer-uuid",
-  "buyerId": "buyer-uuid"
+  "productId": "product-uuid"
 }
 ```
+
+Harga, nama pembeli, dan data penjual diambil server-side dari database —
+jangan pernah mengirim nominal dari client.
 
 Response:
 ```json
@@ -145,6 +149,14 @@ Response:
   }
 }
 ```
+
+### Cek Status Pembayaran
+```
+GET /api/waroengpay/:id
+```
+Hanya bisa dibaca oleh pembeli pemilik transaksi. Mengembalikan status
+terbaru (`pending`/`paid`/`expired`/`cancelled`) dan menyinkronkan status
+final ke database bila webhook belum sampai.
 
 ### Get Payments
 ```
