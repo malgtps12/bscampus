@@ -43,3 +43,6 @@ next-env.d.ts
 
 # laporan lint lokal
 lint-report.txt
+
+# file markdown tidak disimpan di repository
+*.md
