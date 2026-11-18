@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase-server";
-import { validatePassword } from "@/lib/reset-password-helper";
+import { supabase } from "@/lib/supabase";
+import {
+  validateEmail,
+  validateResetCodeFormat,
+  validatePassword,
+} from "@/lib/reset-password-helper";
 import { getClientIp } from "@/lib/auth-utils";
 import { checkResetPasswordRateLimit } from "@/services/reset-password-service";
 
 export const runtime = "nodejs";
 
 /**
- * Pasca klik tautan reset dari email, browser sudah punya session recovery
- * (ditukar di /auth/callback). Endpoint ini mengganti password via Auth API.
+ * Reset password dengan kode 6 digit dari email (Resend).
+ * Tidak memerlukan session Supabase Auth, jadi tetap bekerja saat user
+ * belum bisa login.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -28,10 +33,18 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { newPassword, confirmPassword } = body;
+    const { email, code, newPassword, confirmPassword } = body;
 
-    if (!newPassword || !confirmPassword) {
+    if (!email || !code || !newPassword || !confirmPassword) {
       return NextResponse.json({ error: "Semua field harus diisi" }, { status: 400 });
+    }
+
+    if (typeof email !== "string" || !validateEmail(email.trim())) {
+      return NextResponse.json({ error: "Format email tidak valid" }, { status: 400 });
+    }
+
+    if (typeof code !== "string" || !validateResetCodeFormat(code)) {
+      return NextResponse.json({ error: "Kode harus 6 digit angka" }, { status: 400 });
     }
 
     if (newPassword !== confirmPassword) {
@@ -46,26 +59,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: passwordValidation.message }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    // Fungsi DB memverifikasi kode (hash bcrypt), expiry, dan attempt limit,
+    // lalu mengganti password di auth.users + users.
+    const { data, error } = await supabase.rpc("reset_password_with_code", {
+      p_email: email.trim(),
+      p_code: code,
+      p_new_password: newPassword,
+    });
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
+    if (error) {
+      console.error("[Reset Password] RPC error:", error.message);
       return NextResponse.json(
-        { error: "Tautan reset tidak valid atau sudah kedaluwarsa. Minta tautan baru." },
-        { status: 401 },
+        { error: "Gagal mereset password. Silakan minta kode baru." },
+        { status: 500 },
       );
     }
 
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-
-    if (error) {
-      console.error("[Reset Password] updateUser error:", error.message);
+    const result = data as { ok?: boolean; error?: string } | null;
+    if (!result?.ok) {
       return NextResponse.json(
-        { error: "Gagal mengganti password. Silakan minta tautan reset baru." },
+        { error: result?.error || "Kode tidak valid atau sudah kadaluarsa" },
         { status: 400 },
       );
     }

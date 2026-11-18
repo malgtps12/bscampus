@@ -78,7 +78,8 @@ curl -X POST http://localhost:3000/api/auth/forgot-password \
   -d '{"email": "test@example.com"}'
 ```
 
-Cek console log untuk melihat reset code (development mode).
+Kode reset dibuat di database dan dikirim ke email. Cek inbox (atau Resend
+dashboard → Logs) — kode tidak dicetak ke console.
 
 ### Test di Production
 

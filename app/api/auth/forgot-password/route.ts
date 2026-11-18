@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase-server";
-import { getAppUrl } from "@/lib/app-url";
 import { validateEmail } from "@/lib/reset-password-helper";
-import { checkForgotPasswordRateLimit } from "@/services/reset-password-service";
+import {
+  createResetCode,
+  checkForgotPasswordRateLimit,
+} from "@/services/reset-password-service";
+import { sendResetCodeEmail } from "@/lib/email";
 import { getClientIp } from "@/lib/auth-utils";
+import { supabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
@@ -11,11 +14,14 @@ export const runtime = "nodejs";
 function genericResponse() {
   return NextResponse.json({
     success: true,
-    message:
-      "Jika email terdaftar, tautan reset password telah dikirim. Silakan cek inbox Anda.",
+    message: "Jika email terdaftar, kode reset akan dikirim ke email Anda.",
   });
 }
 
+/**
+ * Kirim kode 6 digit via Resend (bukan email Supabase Auth).
+ * Kode dibuat dan disimpan ter-hash di password_reset_codes.
+ */
 export async function POST(request: NextRequest) {
   try {
     const ip = getClientIp(request);
@@ -43,16 +49,35 @@ export async function POST(request: NextRequest) {
     const targetEmail = email.trim();
     if (!validateEmail(targetEmail)) return genericResponse();
 
-    const supabase = await createClient();
-    const appUrl = getAppUrl(request.nextUrl.origin);
-
-    const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
-      redirectTo: `${appUrl}/auth/callback?next=${encodeURIComponent("/auth/update-password")}`,
-    });
+    // Pastikan email benar-benar terdaftar, tanpa membocorkan hasilnya.
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", targetEmail)
+      .maybeSingle();
 
     if (error) {
-      // Jangan membocorkan apakah email terdaftar atau tidak.
-      console.error("[Forgot Password] resetPasswordForEmail error:", error.message);
+      console.error("[Forgot Password] User lookup error:", error.message);
+    }
+
+    if (!user) return genericResponse();
+
+    const result = await createResetCode(targetEmail);
+    if (!result.success) {
+      // Bisa berarti email tidak terdaftar atau rate limit database tercapai.
+      // Tetap balas generik supaya tidak membocorkan keberadaan akun.
+      console.error("[Forgot Password] Failed to create reset code:", result.error);
+      return genericResponse();
+    }
+
+    const sent = await sendResetCodeEmail(targetEmail, result.code);
+    if (!sent) {
+      // Jangan log kode reset - cukup catat bahwa pengiriman gagal.
+      console.error(`[Forgot Password] Email sending failed for: ${targetEmail}`);
+      return NextResponse.json(
+        { error: "Gagal mengirim email. Periksa konfigurasi RESEND_API_KEY." },
+        { status: 500 },
+      );
     }
 
     return genericResponse();

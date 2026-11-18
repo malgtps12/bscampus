@@ -42,12 +42,15 @@ server mencari email terkait dan memanggil `signInWithPassword`.
 
 Sebelum first run:
 
-1. Jalankan `lib/schema.sql`, `migrations/001..005`, lalu `migrations/006_supabase_auth.sql`
-   di Supabase SQL Editor.
+1. Jalankan `lib/schema.sql`, `migrations/001..005`, `migrations/006_supabase_auth.sql`,
+   lalu `migrations/007_password_reset_rpc.sql` di Supabase SQL Editor.
 2. Aktifkan Email provider di Supabase Authentication.
 3. Daftarkan redirect URL: `${NEXT_PUBLIC_APP_URL}/auth/callback`.
-4. Password lama tetap dipakai bila hash bcrypt-nya valid; hanya akun dengan
+4. Isi `RESEND_API_KEY` dan `RESEND_FROM_EMAIL` untuk kirim kode reset.
+5. Password lama tetap dipakai bila hash bcrypt-nya valid; hanya akun dengan
    hash rusak/null yang perlu **Lupa password**.
+6. Di `/profile`, user bisa ganti password dengan memasukkan password lama,
+   password baru, dan konfirmasi password baru.
 
 Detail lengkap ada di [`SUPABASE_AUTH_MIGRATION.md`](./SUPABASE_AUTH_MIGRATION.md).
 

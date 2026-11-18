@@ -6,6 +6,9 @@
 -- Tabel lama tersebut dibuang lalu dibuat ulang (kode reset bersifat sementara,
 -- jadi tidak ada data yang perlu dipertahankan) supaya kolom email/code_hash
 -- benar-benar terpasang dan aman dijalankan berulang kali.
+--
+-- Catatan: migration 007_password_reset_rpc.sql akan mengganti unique index
+-- email menjadi index biasa dan mengaktifkan RLS. Jalankan 001 sebelum 007.
 
 DROP TABLE IF EXISTS password_reset_codes CASCADE;
 

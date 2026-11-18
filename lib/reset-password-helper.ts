@@ -46,6 +46,11 @@ export function validatePassword(password: string): { valid: boolean; message?: 
   if (!password || password.length < 8) {
     return { valid: false, message: 'Password minimal 8 karakter' }
   }
+  // bcrypt hanya memakai 72 byte pertama. Batasi supaya hash di Auth dan
+  // users.password_hash tidak berbeda untuk password yang panjang.
+  if (password.length > 72) {
+    return { valid: false, message: 'Password maksimal 72 karakter' }
+  }
   return { valid: true }
 }
 

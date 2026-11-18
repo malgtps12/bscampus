@@ -27,6 +27,15 @@ export default function ProfilePage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  const [passwordForm, setPasswordForm] = useState({
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  })
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
+  const [passwordSuccess, setPasswordSuccess] = useState('')
+
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -100,6 +109,39 @@ export default function ProfilePage() {
       setError('Terjadi kesalahan. Silakan coba lagi.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setPasswordForm(prev => ({ ...prev, [name]: value }))
+  }
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPasswordError('')
+    setPasswordSuccess('')
+    setPasswordSaving(true)
+
+    try {
+      const response = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(passwordForm)
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setPasswordSuccess(data.message || 'Password berhasil diganti')
+        setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' })
+      } else {
+        setPasswordError(data.error || 'Gagal mengganti password')
+      }
+    } catch {
+      setPasswordError('Terjadi kesalahan. Silakan coba lagi.')
+    } finally {
+      setPasswordSaving(false)
     }
   }
 
@@ -315,6 +357,89 @@ export default function ProfilePage() {
               </Link>
             </div>
           </form>
+
+          <div className="border-t pt-6 mt-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-2">Ubah Password</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Masukkan password lama, password baru, dan konfirmasi password baru.
+            </p>
+
+            {passwordError && (
+              <div className="bg-red-50 text-red-700 p-3 rounded-lg mb-4 text-sm">
+                {passwordError}
+              </div>
+            )}
+
+            {passwordSuccess && (
+              <div className="bg-green-50 text-green-700 p-3 rounded-lg mb-4 text-sm">
+                {passwordSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Password Lama
+                </label>
+                <input
+                  type="password"
+                  name="oldPassword"
+                  value={passwordForm.oldPassword}
+                  onChange={handlePasswordChange}
+                  autoComplete="current-password"
+                  required
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                  placeholder="Password lama"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Password Baru
+                  </label>
+                  <input
+                    type="password"
+                    name="newPassword"
+                    value={passwordForm.newPassword}
+                    onChange={handlePasswordChange}
+                    autoComplete="new-password"
+                    required
+                    minLength={8}
+                    maxLength={72}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                    placeholder="Minimal 8 karakter"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Konfirmasi Password Baru
+                  </label>
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    value={passwordForm.confirmPassword}
+                    onChange={handlePasswordChange}
+                    autoComplete="new-password"
+                    required
+                    minLength={8}
+                    maxLength={72}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                    placeholder="Ulangi password baru"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={passwordSaving}
+                className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {passwordSaving ? 'Menyimpan...' : 'Ubah Password'}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>

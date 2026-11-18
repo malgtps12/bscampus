@@ -1,64 +1,51 @@
-# Fitur Reset Password 6-Digit dengan Supabase + Resend
+# Reset Password 6 Digit (Supabase RPC + Resend)
 
-## 📦 Package yang Harus Di-install
+Alur lupa password tidak bergantung pada email Supabase Auth. Aplikasi
+membuat kode 6 digit lewat RPC, mengirimnya dengan Resend, lalu memverifikasi
+kode di database. Tidak ada `SUPABASE_SERVICE_ROLE_KEY` yang dipakai.
 
-```bash
-# Sudah ada di project:
-# - @supabase/supabase-js (database: tabel users + password_reset_codes)
-# - resend (pengiriman email transaksional)
-# - rate-limiter-flexible (rate limiting per IP)
-# - bcryptjs (hash password & hash kode reset)
-```
+## Migration yang wajib dijalankan
 
----
+1. `migrations/001_add_password_reset.sql` — tabel `password_reset_codes`.
+2. `migrations/007_password_reset_rpc.sql` — RPC buat/verifikasi kode, RLS,
+   pencabutan akses langsung ke tabel, dan penghapusan unique index email.
 
-## 📁 Struktur File
+Jalankan keduanya di Supabase SQL Editor sebelum deploy.
 
-```
-bscampus/
-├── lib/
-│   ├── reset-password-helper.ts # Helper generate & verify kode
-│   ├── reset-password.ts        # Validasi format email/ kode / password
-│   └── email.ts                 # Kirim email via Resend (sendResetCodeEmail)
-├── services/
-│   └── reset-password-service.ts # Business logic & rate limiting (Supabase)
-├── migrations/
-│   └── 001_add_password_reset.sql # Tabel password_reset_codes (jalankan di SQL Editor)
-├── app/
-│   ├── api/auth/forgot-password/route.ts  # POST kirim kode
-│   ├── api/auth/reset-password/route.ts   # POST reset password
-│   └── forgot-password/page.tsx           # Frontend React
-```
-
----
-
-## ⚙️ Setup Environment Variables
+## Environment
 
 ```env
-# Supabase (sudah dipakai untuk login/register)
 NEXT_PUBLIC_SUPABASE_URL=your-project-url
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-anon-key
-
-# Resend untuk kirim email (lihat RESEND_SETUP.md)
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxxxx
 RESEND_API_KEY=re_xxxxxxxx
 RESEND_FROM_EMAIL=BSCampus <onboarding@resend.dev>
 ```
 
-> Migration `migrations/001_add_password_reset.sql` harus dijalankan sekali
-> di Supabase SQL Editor untuk membuat tabel `password_reset_codes`.
+`RESEND_API_KEY` wajib. Tanpa itu, `POST /api/auth/forgot-password` mengembalikan
+error 500 dan kode tidak dikirim.
 
----
+## Alur UI
 
-## 🚀 Endpoint 1: POST /api/auth/forgot-password
+`/forgot-password` dua langkah:
 
-### Request (cURL):
+1. Input email → `POST /api/auth/forgot-password`.
+2. Input kode 6 digit + password baru + konfirmasi →
+   `POST /api/auth/reset-password`. Tersedia tombol **Kirim ulang kode**.
+
+## Endpoint
+
+### `POST /api/auth/forgot-password`
+
+Request:
+
 ```bash
 curl -X POST http://localhost:3000/api/auth/forgot-password \
   -H "Content-Type: application/json" \
   -d '{"email": "user@student.pnl.ac.id"}'
 ```
 
-### Response Success (selalu sama untuk keamanan):
+Respons selalu generik untuk email terdaftar maupun tidak:
+
 ```json
 {
   "success": true,
@@ -66,18 +53,13 @@ curl -X POST http://localhost:3000/api/auth/forgot-password \
 }
 ```
 
-### Response Rate Limit (429):
-```json
-{
-  "error": "Terlalu banyak permintaan. Silakan coba lagi nanti."
-}
-```
+Rate limit aplikasi: 5 request / 15 menit / IP (429 + `Retry-After`).
+Database juga membatasi 5 kode / 15 menit / email.
 
----
+### `POST /api/auth/reset-password`
 
-## 🔐 Endpoint 2: POST /api/auth/reset-password
+Request:
 
-### Request (cURL):
 ```bash
 curl -X POST http://localhost:3000/api/auth/reset-password \
   -H "Content-Type: application/json" \
@@ -89,102 +71,58 @@ curl -X POST http://localhost:3000/api/auth/reset-password \
   }'
 ```
 
-### Response Success:
+Respons sukses:
+
 ```json
 {
   "success": true,
-  "message": "Password berhasil direset. Silakan login dengan password baru."
+  "message": "Password berhasil diganti. Silakan login dengan password baru."
 }
 ```
 
-### Response Error (contoh):
+Error kode sengaja seragam:
+
+```json
+{ "error": "Kode tidak valid atau sudah kadaluarsa. Minta kode baru." }
+```
+
+## Detail keamanan
+
+- `create_password_reset_code(p_email)` membuat kode dengan
+  `gen_random_bytes(4)` (bukan `random()`), lalu menyimpan
+  `crypt(kode, gen_salt('bf', 10))`. Kode plaintext hanya dikembalikan sekali
+  ke aplikasi untuk dikirim via email.
+- `reset_password_with_code(email, kode, password)` memverifikasi kode dengan
+  `crypt()`, memeriksa `expires_at` (10 menit) dan `attempts` (maksimal 5),
+  lalu menulis `auth.users.encrypted_password` dan `users.password_hash`.
+- Kode ditandai `used = TRUE` setelah sukses, sehingga tidak bisa dipakai ulang.
+- Kode yang lebih lama otomatis kalah karena query mengambil baris terbaru.
+- Tabel `password_reset_codes` memiliki RLS dan tidak punya policy; akses
+  langsung dari klien dicabut. Semua operasi lewat fungsi `SECURITY DEFINER`.
+- Password dibatasi 8–72 karakter agar hash bcrypt di Auth dan di `users`
+  identik.
+- Response forgot-password tidak membocorkan apakah email terdaftar.
+
+## Ganti password dari akun
+
+`POST /api/auth/change-password` menerima hanya:
+
 ```json
 {
-  "error": "Kode tidak valid"
+  "oldPassword": "passwordlama",
+  "newPassword": "passwordbaru",
+  "confirmPassword": "passwordbaru"
 }
 ```
 
----
+Endpoint ini hanya untuk user yang sudah login. Password lama diverifikasi
+dengan `signInWithPassword`, lalu password baru disimpan dengan
+`auth.updateUser({ password })` dan `users.password_hash` ikut disinkronkan.
 
-## 📋 Penjelasan Tiap Langkah
+## Testing manual
 
-### 1. **Generate Kode (crypto.randomInt)**
-- Menggunakan `crypto.randomInt(0, 1000000)` untuk keamanan cryptographic
-- Padding nol: `"123"` → `"000123"` (selalu 6 digit)
-- Bukan Math.random() yang predictable
-
-### 2. **Hash Kode (bcrypt)**
-- Kode asli tidak disimpan di database
-- Hash dengan bcrypt salt rounds 10
-- Verifikasi dengan bcrypt.compare()
-
-### 3. **Masa Berlaku Kode (10 menit)**
-- `expires_at` disimpan di tabel `password_reset_codes`
-- Lewat 10 menit → kode dianggap kadaluarsa & dibuang
-- Tidak perlu cron job manual (dicek saat verifikasi)
-
-### 4. **Batas 5x Percobaan**
-- Setiap kode salah → attempts +1
-- Attempts >= 5 → kode dihapus
-- User harus minta kode baru
-
-### 5. **One-time Use**
-- Kode dihapus setelah password berhasil direset
-- Tidak bisa reuse kode yang sama
-
-### 6. **Replace Kode Lama**
-- Request kode baru → delete kode lama untuk email tersebut
-- Hanya 1 kode aktif per email (unique index)
-
-### 7. **Rate Limiting**
-- 5 requests per 15 menit per IP
-- Untuk kedua endpoint (forgot & reset)
-- Response 429 dengan Retry-After header
-
-### 8. **Anti User Enumeration**
-- Response forgot-password selalu sama
-- Tidak bocorkan apakah email terdaftar atau tidak
-- Attacker tidak bisa brute force cek email
-
-### 9. **Validasi Input**
-- Kode: regex `/^\d{6}$/` (harus 6 digit angka)
-- Password: min 8 karakter
-- Email: regex validasi format
-
-### 10. **Password Hashing**
-- Password baru di-hash dengan bcrypt (salt 10)
-- Tidak disimpan plain text
-
----
-
-## 🧪 Testing
-
-```bash
-# 1. Jalankan dev server
-npm run dev
-
-# 2. Buka halaman
-http://localhost:3000/forgot-password
-
-# 3. Test flow:
-# - Input email → kirim kode
-# - Cek email untuk kode 6 digit
-# - Input kode + password baru
-# - Login dengan password baru
-```
-
----
-
-## 🔒 Keamanan Checklist
-
-- ✅ crypto.randomInt (bukan Math.random)
-- ✅ Padding nol (selalu 6 digit)
-- ✅ Bcrypt hash kode
-- ✅ TTL 10 menit
-- ✅ Max 5 attempts
-- ✅ One-time use
-- ✅ Replace old code
-- ✅ Rate limiting
-- ✅ Anti-enumeration response
-- ✅ Validasi 6 digit + min 8 char
-- ✅ Bcrypt password
+1. `npm run dev`.
+2. Buka `http://localhost:3000/forgot-password`.
+3. Masukkan email terdaftar, cek inbox Resend untuk kode 6 digit.
+4. Masukkan kode + password baru + konfirmasi, lalu login dengan password baru.
+5. Login, buka `/profile`, coba Ubah Password dengan password lama/baru/konfirmasi.

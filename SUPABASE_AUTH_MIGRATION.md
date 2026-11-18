@@ -33,34 +33,42 @@ memanggil fungsi tersebut, bukan lagi `verifyJWT(cookie user_token)`.
 | --- | --- |
 | `POST /api/auth/user-login` | Terima NIM, cari email, panggil `supabase.auth.signInWithPassword`. Tidak lagi membandingkan bcrypt. |
 | `POST /api/auth/register` | `supabase.auth.signUp` dengan metadata `name`, `student_id`, `phone`, `campus`. Baris `users` dibuat trigger DB. |
-| `POST /api/auth/forgot-password` | `auth.resetPasswordForEmail` dengan `redirectTo /auth/callback?next=/auth/update-password`. |
-| `GET /auth/callback` | Tukar `code` menjadi session cookie. |
-| `POST /api/auth/reset-password` | `auth.updateUser({ password })` untuk session recovery. |
+| `POST /api/auth/forgot-password` | Buat kode 6 digit via RPC `create_password_reset_code`, kirim via Resend. Tidak memakai email Supabase Auth. |
+| `POST /api/auth/reset-password` | Panggil RPC `reset_password_with_code` untuk verifikasi kode + update `auth.users` tanpa service role key. |
+| `POST /api/auth/change-password` | Baru. User login mengirim password lama, password baru, konfirmasi; verifikasi via `signInWithPassword` lalu `auth.updateUser`. |
+| `GET /auth/callback` | Tukar `code` menjadi session cookie (tetap dipakai verifikasi email registrasi). |
 | `GET /api/auth/me` | Baca session Auth lalu petakan ke `public.users`. |
 | `POST /api/auth/logout` | `auth.signOut()` + bersihkan cookie lama. |
 | `POST /api/uploads/product-images` | Baru. Hanya user login; path `products/<public.users.id>/...`. |
 
-Halaman baru: `/auth/update-password`. Halaman `/forgot-password` kini
-satu langkah (kirim tautan, bukan kode 6 digit).
+Halaman `/forgot-password` kini dua langkah: email → kode 6 digit + password
+baru + konfirmasi. Halaman `/auth/update-password` hanya me-redirect ke
+`/forgot-password` untuk bookmark/link lama. Form **Ubah Password** di
+`/profile` hanya meminta password lama, password baru, dan konfirmasi password
+baru.
 
 ## Langkah deploy
 
 1. Backup database.
 2. Jalankan migrasi lama jika belum: `lib/schema.sql`, `migrations/001..005`.
 3. Jalankan `migrations/006_supabase_auth.sql`.
-4. Di Supabase Dashboard → Authentication → Providers, aktifkan **Email**.
-5. Di Authentication → URL Configuration, tambahkan redirect URL:
+4. Jalankan `migrations/007_password_reset_rpc.sql` (**wajib** sebelum deploy
+   fitur lupa/ganti password). Migration ini membuat RPC reset, mengaktifkan
+   RLS pada `password_reset_codes`, dan mencabut akses langsung tabel dari
+   `anon`/`authenticated`.
+5. Di Supabase Dashboard → Authentication → Providers, aktifkan **Email**.
+6. Di Authentication → URL Configuration, tambahkan redirect URL:
    ```
    https://<domain-anda>/auth/callback
    ```
-6. Isi env berikut di Vercel:
+7. Isi env berikut di Vercel:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
    - `NEXT_PUBLIC_APP_URL`
    - `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `JWT_SECRET`
    - `WAROENGPAY_API_KEY`, `WAROENGPAY_WEBHOOK_SECRET`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`
-7. Deploy, lalu uji registrasi user baru dan login.
-8. Uji login salah satu user lama dengan password lamanya.
+8. Deploy, lalu uji registrasi user baru dan login.
+9. Uji login salah satu user lama dengan password lamanya.
 
 ## Catatan user lama (tanpa reset password)
 
@@ -81,8 +89,28 @@ reset password**. Script ini hanya menyentuh akun yang belum pernah login dan
 belum mengubah `updated_at`, sehingga tidak akan menimpa password baru hasil
 reset.
 
-Kolom lama `password_hash`, `password_reset_codes`, dan service reset lama
-dibiarkan untuk audit/rollback, tetapi tidak lagi dipakai alur Auth baru.
+Kolom `password_hash` tetap disinkronkan untuk audit/rollback, tetapi sumber
+kebenaran login adalah `auth.users.encrypted_password`.
+
+## Reset password realtime (kode via email)
+
+- `POST /api/auth/forgot-password` memanggil RPC `create_password_reset_code`.
+  Kode 6 digit dibuat di database dengan `gen_random_bytes`, di-hash dengan
+  bcrypt (`pgcrypto`), lalu dikembalikan sekali ke aplikasi untuk dikirim via
+  Resend. Kode berlaku 10 menit dan maksimal 5 kali salah.
+- Tabel `password_reset_codes` sudah dienkripsi RLS dan akses langsungnya
+  dicabut dari `anon`/`authenticated`. Klien hanya bisa memanggil RPC yang
+  sudah dibatasi (maksimal 5 kode per email per 15 menit).
+- `POST /api/auth/reset-password` memanggil RPC `reset_password_with_code`.
+  RPC memverifikasi kode, memperbarui `auth.users.encrypted_password`,
+  menyinkronkan `users.password_hash`, lalu menandai kode `used = TRUE`.
+- Semua error kode sengaja seragam: `Kode tidak valid atau sudah kadaluarsa.
+  Minta kode baru.` supaya tidak membocorkan keberadaan email.
+- `RESEND_API_KEY` wajib diisi. Tanpa itu endpoint forgot-password mengembalikan
+  error 500 dan kode tidak dikirim.
+- Ganti password dari `/profile` memakai `POST /api/auth/change-password`:
+  password lama diverifikasi `signInWithPassword`, password baru disimpan
+  `auth.updateUser`, lalu `users.password_hash` disinkronkan.
 
 ## Keamanan upload
 
