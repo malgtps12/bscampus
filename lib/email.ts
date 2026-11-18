@@ -16,10 +16,22 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       return false
     }
 
+    const from = process.env.RESEND_FROM_EMAIL?.trim()
+    const fromEmail =
+      from?.match(/<([^\s@]+@[^\s@]+\.[^\s@]+)>/)?.[1] ??
+      from?.match(/^([^\s@]+@[^\s@]+\.[^\s@]+)$/)?.[1]
+
+    if (!from || !fromEmail) {
+      console.error(
+        '[Resend] RESEND_FROM_EMAIL harus alamat email lengkap, misalnya no-reply@domain-valid.com',
+      )
+      return false
+    }
+
     const resend = new Resend(apiKey)
 
     const result = await resend.emails.send({
-      from: process.env.RESEND_FROM_EMAIL || 'no-reply@bscampus.com',
+      from,
       to: options.to,
       subject: options.subject,
       text: options.text,

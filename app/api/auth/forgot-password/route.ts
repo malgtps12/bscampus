@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       // Jangan log kode reset - cukup catat bahwa pengiriman gagal.
       console.error(`[Forgot Password] Email sending failed for: ${targetEmail}`);
       return NextResponse.json(
-        { error: "Gagal mengirim email. Periksa konfigurasi RESEND_API_KEY." },
+        { error: "Gagal mengirim email. Periksa konfigurasi RESEND_API_KEY dan RESEND_FROM_EMAIL." },
         { status: 500 },
       );
     }
