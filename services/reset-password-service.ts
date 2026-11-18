@@ -29,6 +29,27 @@ const changePasswordLimiter = new RateLimiterMemory({
 
 type ServiceResult<T> = T & { success: boolean; error?: string };
 
+/** Cek apakah email terdaftar (tabel users sudah bisa dibaca publishable key). */
+export async function isEmailRegistered(email: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select("id")
+      .ilike("email", email)
+      .limit(1);
+
+    if (error) {
+      console.error("[Reset Service] Email lookup error:", error.message);
+      return false;
+    }
+
+    return Array.isArray(data) && data.length > 0;
+  } catch (error) {
+    console.error("[Reset Service] Email lookup failed:", error);
+    return false;
+  }
+}
+
 /**
  * Minta kode 6 digit baru. RPC mengembalikan kode plaintext hanya sekali;
  * aplikasi lalu mengirimnya lewat Resend. Mengembalikan success=false bila
@@ -52,10 +73,13 @@ export async function createResetCode(
     }
 
     if (typeof data !== "string" || !/^\d{6}$/.test(data)) {
+      // RPC mengembalikan NULL jika email tidak terdaftar ATAU batas 5 kode
+      // per 15 menit tercapai. Bedakan di route supaya user tidak terus
+      // menunggu email yang sebenarnya tidak pernah dikirim.
       return {
         code: "",
         success: false,
-        error: "Email tidak terdaftar atau terlalu banyak permintaan",
+        error: "RATE_LIMITED_OR_UNKNOWN",
       };
     }
 

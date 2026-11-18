@@ -3,6 +3,7 @@ import { validateEmail } from "@/lib/reset-password-helper";
 import {
   createResetCode,
   checkForgotPasswordRateLimit,
+  isEmailRegistered,
 } from "@/services/reset-password-service";
 import { sendResetCodeEmail } from "@/lib/email";
 import { getClientIp } from "@/lib/auth-utils";
@@ -48,14 +49,23 @@ export async function POST(request: NextRequest) {
     const targetEmail = email.trim();
     if (!validateEmail(targetEmail)) return genericResponse();
 
+    // Balas generik untuk email tidak terdaftar agar tidak membocorkan akun.
+    if (!(await isEmailRegistered(targetEmail))) return genericResponse();
+
     // RPC memakai SECURITY DEFINER dan sudah mengecek email secara
     // case-insensitive, sehingga tidak bergantung pada RLS/GRANT tabel users.
     const result = await createResetCode(targetEmail);
     if (!result.success) {
-      // Bisa berarti email tidak terdaftar atau rate limit database tercapai.
-      // Tetap balas generik supaya tidak membocorkan keberadaan akun.
+      // Email terdaftar tapi RPC gagal -> hampir pasti batas 5 kode/15 menit.
+      // Beri tahu user supaya tidak menunggu email yang tidak pernah dikirim.
       console.error("[Forgot Password] Failed to create reset code:", result.error);
-      return genericResponse();
+      return NextResponse.json(
+        {
+          error:
+            "Terlalu banyak permintaan kode reset. Coba lagi dalam 15 menit.",
+        },
+        { status: 429, headers: { "Retry-After": "900" } },
+      );
     }
 
     const sent = await sendResetCodeEmail(targetEmail, result.code);
