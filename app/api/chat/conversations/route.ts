@@ -1,36 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase-server"
-import { verifyJWT } from "@/lib/auth-utils"
+import { getCurrentUser } from "@/lib/dal"
 
 export const runtime = 'nodejs'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const token = request.cookies.get("user_token")?.value
+    const currentUser = await getCurrentUser()
 
-    if (!token) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-
-    const decoded = verifyJWT(token)
-    if (!decoded) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 })
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const supabase = await createClient()
-    
-    const { data: user } = await supabase
-      .from('users')
-      .select('id')
-      .eq('student_id', decoded.username)
-      .single()
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 })
-    }
 
     const { data: conversations, error } = await supabase
       .from('conversations')
@@ -39,7 +21,7 @@ export async function GET(request: NextRequest) {
         buyer:buyer_id(id, name, student_id),
         seller:seller_id(id, name, student_id)
       `)
-      .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
+      .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
       .order('updated_at', { ascending: false })
 
     if (error) {
@@ -85,18 +67,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get("user_token")?.value
+    const currentUser = await getCurrentUser()
 
-    if (!token) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-
-    const decoded = verifyJWT(token)
-    if (!decoded) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 })
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const body = await request.json()
@@ -110,18 +84,8 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await createClient()
-    
-    const { data: buyer } = await supabase
-      .from('users')
-      .select('id')
-      .eq('student_id', decoded.username)
-      .single()
 
-    if (!buyer) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 })
-    }
-
-    if (buyer.id === sellerId) {
+    if (currentUser.id === sellerId) {
       return NextResponse.json(
         { error: "Cannot chat dengan diri sendiri" },
         { status: 400 }
@@ -132,7 +96,7 @@ export async function POST(request: NextRequest) {
       .from('conversations')
       .select('id')
       .eq('product_id', productId)
-      .eq('buyer_id', buyer.id)
+      .eq('buyer_id', currentUser.id)
       .eq('seller_id', sellerId)
       .single()
 
@@ -144,7 +108,7 @@ export async function POST(request: NextRequest) {
       .from('conversations')
       .insert({
         product_id: productId,
-        buyer_id: buyer.id,
+        buyer_id: currentUser.id,
         seller_id: sellerId
       })
       .select()

@@ -8,6 +8,9 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const registered = searchParams.get('registered') === 'true'
+  const needsVerification = searchParams.get('verify') === 'true'
+  const resetSuccess = searchParams.get('reset') === 'success'
+  const callbackError = searchParams.get('error')
   const redirect = searchParams.get('redirect') || '/'
 
   const [formData, setFormData] = useState({
@@ -72,7 +75,26 @@ function LoginForm() {
               <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>Registrasi berhasil! Silakan login dengan akun yang telah dibuat.</span>
+              <span>
+                {needsVerification
+                  ? 'Registrasi berhasil! Silakan buka email Anda untuk verifikasi sebelum login.'
+                  : 'Registrasi berhasil! Silakan login dengan akun yang telah dibuat.'}
+              </span>
+            </div>
+          )}
+
+          {resetSuccess && (
+            <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-lg mb-4 text-sm flex items-start gap-3">
+              <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Password berhasil diganti. Silakan login dengan password baru.</span>
+            </div>
+          )}
+
+          {callbackError && (
+            <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-lg mb-4 text-sm">
+              Tautan tidak valid. Silakan minta tautan baru melalui menu Lupa password.
             </div>
           )}
 

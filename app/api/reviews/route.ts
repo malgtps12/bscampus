@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
-import { checkApiRateLimit, verifyJWT, getClientIp } from "@/lib/auth-utils"
+import { checkApiRateLimit, getClientIp } from "@/lib/auth-utils"
+import { getCurrentUser } from "@/lib/dal"
 
 export const runtime = 'nodejs'
 
@@ -88,10 +89,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const token = request.cookies.get("user_token")?.value
-    const decoded = token ? verifyJWT(token) : null
+    const currentUser = await getCurrentUser()
 
-    if (!decoded) {
+    if (!currentUser) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -115,25 +115,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // user_id diambil dari token, bukan dari body request
-    const { data: reviewer } = await supabase
-      .from('users')
-      .select('id')
-      .eq('student_id', decoded.username)
-      .single()
-
-    if (!reviewer) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-
+    // user_id diambil dari sesi Auth, bukan dari body request
     const { data, error } = await supabase
       .from('reviews')
       .insert({
         product_id,
-        user_id: reviewer.id,
+        user_id: currentUser.id,
         rating,
         comment: comment || "",
       })

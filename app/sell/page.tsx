@@ -6,7 +6,6 @@ import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ArrowLeft, Upload, Plus, X } from "lucide-react";
-import { uploadProductImages } from "@/lib/storage";
 
 interface SellUser {
   id: string
@@ -119,8 +118,22 @@ export default function SellPage() {
     setUploading(true);
 
     try {
-      // Upload images to Supabase Storage
-      const uploadedUrls = await uploadProductImages(imageFiles);
+      // Upload via route terproteksi: server memakai session Auth dan
+      // menentukan folder pemilik dari public.users.id (bukan dari body).
+      const uploadBody = new FormData();
+      imageFiles.forEach((file) => uploadBody.append("files", file));
+
+      const uploadResponse = await fetch("/api/uploads/product-images", {
+        method: "POST",
+        body: uploadBody,
+      });
+
+      if (!uploadResponse.ok) {
+        const uploadError = await uploadResponse.json().catch(() => null);
+        throw new Error(uploadError?.error || "Gagal mengunggah gambar");
+      }
+
+      const { urls: uploadedUrls } = await uploadResponse.json();
 
       // Create product with uploaded image URLs
       const response = await fetch("/api/products", {

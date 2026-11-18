@@ -1,6 +1,11 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from "@supabase/supabase-js";
+import { getSupabaseEnv } from "./supabase-env";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
+const { url, key } = getSupabaseEnv();
 
-export const supabase = createClient(supabaseUrl, supabaseKey)
+/**
+ * Client anon untuk query public (tanpa session user).
+ * Untuk data/operasi yang bergantung pada sesi, gunakan createClient()
+ * dari lib/supabase-server.ts agar cookie diteruskan dan RLS aktif.
+ */
+export const supabase = createClient(url, key);

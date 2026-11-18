@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase-server"
-import { verifyJWT } from "@/lib/auth-utils"
+import { getCurrentUser } from "@/lib/dal"
 
 export const runtime = 'nodejs'
 
@@ -10,31 +10,13 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const token = request.cookies.get("user_token")?.value
+    const currentUser = await getCurrentUser()
 
-    if (!token) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-
-    const decoded = verifyJWT(token)
-    if (!decoded) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 })
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const supabase = await createClient()
-
-    const { data: currentUser } = await supabase
-      .from('users')
-      .select('id')
-      .eq('student_id', decoded.username)
-      .single()
-
-    if (!currentUser) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 })
-    }
 
     // Pastikan caller adalah peserta percakapan (buyer atau seller)
     const { data: conversation } = await supabase
@@ -83,18 +65,10 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const token = request.cookies.get("user_token")?.value
+    const currentUser = await getCurrentUser()
 
-    if (!token) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-
-    const decoded = verifyJWT(token)
-    if (!decoded) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 })
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const body = await request.json()
@@ -108,16 +82,6 @@ export async function POST(
     }
 
     const supabase = await createClient()
-    
-    const { data: sender } = await supabase
-      .from('users')
-      .select('id')
-      .eq('student_id', decoded.username)
-      .single()
-
-    if (!sender) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 })
-    }
 
     // Pastikan caller adalah peserta percakapan (buyer atau seller)
     const { data: conversation } = await supabase
@@ -128,7 +92,7 @@ export async function POST(
 
     if (
       !conversation ||
-      (conversation.buyer_id !== sender.id && conversation.seller_id !== sender.id)
+      (conversation.buyer_id !== currentUser.id && conversation.seller_id !== currentUser.id)
     ) {
       return NextResponse.json(
         { error: "Forbidden - Anda bukan peserta percakapan ini" },
@@ -140,7 +104,7 @@ export async function POST(
       .from('messages')
       .insert({
         conversation_id: id,
-        sender_id: sender.id,
+        sender_id: currentUser.id,
         content: content.trim()
       })
       .select(`

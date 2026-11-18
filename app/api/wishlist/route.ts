@@ -1,21 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
-import { checkApiRateLimit, verifyJWT, getClientIp } from "@/lib/auth-utils"
+import { checkApiRateLimit, getClientIp } from "@/lib/auth-utils"
+import { getCurrentUser } from "@/lib/dal"
 
 export const runtime = 'nodejs'
 
-async function getCurrentUserId(request: NextRequest): Promise<string | null> {
-  const token = request.cookies.get("user_token")?.value
-  const decoded = token ? verifyJWT(token) : null
-  if (!decoded) return null
-
-  const { data: user } = await supabase
-    .from('users')
-    .select('id')
-    .eq('student_id', decoded.username)
-    .single()
-
-  return user?.id ?? null
+async function getCurrentUserId(): Promise<string | null> {
+  const currentUser = await getCurrentUser()
+  return currentUser?.id ?? null
 }
 
 export async function GET(request: NextRequest) {
@@ -29,8 +21,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // user_id diambil dari token - user hanya bisa melihat wishlist miliknya
-    const userId = await getCurrentUserId(request)
+    // user_id diambil dari sesi Auth - user hanya bisa melihat wishlist miliknya
+    const userId = await getCurrentUserId()
 
     if (!userId) {
       return NextResponse.json(
@@ -84,7 +76,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const userId = await getCurrentUserId(request)
+    const userId = await getCurrentUserId()
 
     if (!userId) {
       return NextResponse.json(
@@ -154,7 +146,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const userId = await getCurrentUserId(request)
+    const userId = await getCurrentUserId()
 
     if (!userId) {
       return NextResponse.json(

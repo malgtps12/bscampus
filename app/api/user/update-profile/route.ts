@@ -1,21 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
-import { verifyJWT } from "@/lib/auth-utils"
-import { supabase } from "@/lib/supabase"
+import { getCurrentUser } from "@/lib/dal"
+import { createClient } from "@/lib/supabase-server"
 
 export const runtime = 'nodejs'
 
 export async function PUT(request: NextRequest) {
   try {
-    const token = request.cookies.get("user_token")?.value
+    const currentUser = await getCurrentUser()
 
-    if (!token) {
+    if (!currentUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const decoded = verifyJWT(token)
-
-    if (!decoded) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 })
     }
 
     const body = await request.json()
@@ -38,10 +32,12 @@ export async function PUT(request: NextRequest) {
     if (ewalletType !== undefined) updateData.ewallet_type = ewalletType
     if (ewalletNumber !== undefined) updateData.ewallet_number = ewalletNumber
 
+    const supabase = await createClient()
+
     const { data, error } = await supabase
       .from('users')
       .update(updateData)
-      .eq('student_id', decoded.username)
+      .eq('id', currentUser.id)
       .select('id, name, student_id, email, phone, campus, bank_name, account_number, account_holder_name, ewallet_type, ewallet_number')
       .single()
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { verifyJWT, verifyAdminJWT } from "@/lib/auth-utils"
+import { verifyAdminJWT } from "@/lib/auth-utils"
+import { getCurrentUser } from "@/lib/dal"
 import { supabase } from "@/lib/supabase"
 
 export const runtime = 'nodejs'
@@ -53,11 +54,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Wajib login - identitas buyer diambil dari token, bukan dari body
-    const token = request.cookies.get("user_token")?.value
-    const decoded = token ? verifyJWT(token) : null
+    // Wajib login - identitas buyer diambil dari sesi Auth, bukan dari body
+    const currentUser = await getCurrentUser()
 
-    if (!decoded || decoded.role !== 'user') {
+    if (!currentUser) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (product.seller_student_id === decoded.username) {
+    if (product.seller_student_id === currentUser.studentId) {
       return NextResponse.json(
         { error: "Tidak bisa membeli produk sendiri" },
         { status: 400 }
@@ -112,19 +112,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Identitas pembeli dari token (student_id = username pada klaim JWT)
-    const { data: buyer, error: buyerError } = await supabase
-      .from("users")
-      .select("id, name")
-      .eq("student_id", decoded.username)
-      .single()
-
-    if (buyerError || !buyer) {
-      return NextResponse.json(
-        { error: "Akun pembeli tidak ditemukan" },
-        { status: 400 }
-      )
-    }
+    // Identitas pembeli dari sesi Auth yang sudah dipetakan ke public.users.id.
+    const buyer = { id: currentUser.id, name: currentUser.name }
 
     // Kolom transactions.seller_id adalah UUID - cari user penjual dari NIM
     const { data: seller, error: sellerError } = await supabase

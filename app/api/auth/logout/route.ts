@@ -1,27 +1,19 @@
-import { NextResponse } from "next/server"
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase-server";
 
 export async function POST() {
-  const response = NextResponse.json({ success: true })
-  
-  response.cookies.set({
-    name: "user_token",
-    value: "",
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: 0,
-    path: "/",
-  })
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signOut();
 
-  response.cookies.set({
-    name: "admin_token",
-    value: "",
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: 0,
-    path: "/",
-  })
+  if (error) {
+    console.error("[Logout] signOut error:", error.message);
+  }
 
-  return response
+  const response = NextResponse.json({ success: true });
+
+  // Cookie JWT lama (user) dan admin tetap dibersihkan.
+  response.cookies.set({ name: "user_token", value: "", path: "/", maxAge: 0 });
+  response.cookies.set({ name: "admin_token", value: "", path: "/", maxAge: 0 });
+
+  return response;
 }

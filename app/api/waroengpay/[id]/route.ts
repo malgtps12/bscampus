@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { verifyJWT } from "@/lib/auth-utils"
+import { getCurrentUser } from "@/lib/dal"
 import { supabase } from "@/lib/supabase"
 
 export const runtime = 'nodejs'
@@ -28,29 +28,18 @@ export async function GET(
 
   try {
     const { id } = await params
-    const token = request.cookies.get("user_token")?.value
-    const decoded = token ? verifyJWT(token) : null
+    const currentUser = await getCurrentUser()
 
-    if (!decoded) {
+    if (!currentUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     // Cari transaksi milik caller dengan payment_id ini
-    const { data: buyer } = await supabase
-      .from("users")
-      .select("id")
-      .eq("student_id", decoded.username)
-      .single()
-
-    if (!buyer) {
-      return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 })
-    }
-
     const { data: transaction } = await supabase
       .from("transactions")
       .select("id, status, payment_id, price, product_id")
       .eq("payment_id", id)
-      .eq("buyer_id", buyer.id)
+      .eq("buyer_id", currentUser.id)
       .maybeSingle()
 
     if (!transaction) {

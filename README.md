@@ -32,7 +32,28 @@ npm install
 npm run dev
 ```
 
-3. Buka browser dan akses: `http://localhost:3000`
+3. Salin `.env.example` ke `.env.local` dan isi nilainya.
+4. Buka browser dan akses: `http://localhost:3000`
+
+## Autentikasi & Database
+
+Login user memakai **Supabase Auth**. NIM tetap dipakai di form login, lalu
+server mencari email terkait dan memanggil `signInWithPassword`.
+
+Sebelum first run:
+
+1. Jalankan `lib/schema.sql`, `migrations/001..005`, lalu `migrations/006_supabase_auth.sql`
+   di Supabase SQL Editor.
+2. Aktifkan Email provider di Supabase Authentication.
+3. Daftarkan redirect URL: `${NEXT_PUBLIC_APP_URL}/auth/callback`.
+4. Password lama tetap dipakai bila hash bcrypt-nya valid; hanya akun dengan
+   hash rusak/null yang perlu **Lupa password**.
+
+Detail lengkap ada di [`SUPABASE_AUTH_MIGRATION.md`](./SUPABASE_AUTH_MIGRATION.md).
+
+> Jangan pernah menaruh `SUPABASE_SERVICE_ROLE_KEY` di kode atau env aplikasi.
+> Aplikasi hanya memakai `NEXT_PUBLIC_SUPABASE_URL` dan
+> `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 
 ## Deploy ke Vercel
 

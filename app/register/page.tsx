@@ -51,7 +51,8 @@ export default function RegisterPage() {
       const data = await response.json()
 
       if (response.ok) {
-        router.push('/login?registered=true')
+        const verify = data.requiresVerification ? '&verify=true' : ''
+        router.push(`/login?registered=true${verify}`)
       } else {
         setError(data.error || 'Registrasi gagal')
       }

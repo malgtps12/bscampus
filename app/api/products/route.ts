@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
-import { verifyJWT } from "@/lib/auth-utils";
+import { getCurrentUser } from "@/lib/dal";
 
 export const runtime = 'nodejs'
 
@@ -29,20 +29,11 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get("user_token")?.value
+    const currentUser = await getCurrentUser()
 
-    if (!token) {
+    if (!currentUser) {
       return NextResponse.json(
         { error: "Anda harus login terlebih dahulu untuk menjual produk" },
-        { status: 401 }
-      )
-    }
-
-    const decoded = verifyJWT(token)
-
-    if (!decoded) {
-      return NextResponse.json(
-        { error: "Token tidak valid. Silakan login kembali" },
         { status: 401 }
       )
     }
@@ -66,29 +57,16 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
 
-    // Identitas penjual diambil dari token, bukan dari body request
-    const { data: seller } = await supabase
-      .from("users")
-      .select("name, phone")
-      .eq("student_id", decoded.username)
-      .single();
-
-    if (!seller) {
-      return NextResponse.json(
-        { error: "Token tidak valid. Silakan login kembali" },
-        { status: 401 }
-      );
-    }
-
+    // Identitas penjual diambil dari sesi Auth, bukan dari body request.
     const productData = {
       title: body.title,
       description: body.description || "",
       price,
       category: body.category || "lainnya",
       condition: body.condition || "bekas",
-      seller_name: seller.name,
-      seller_student_id: decoded.username,
-      seller_contact: seller.phone || "",
+      seller_name: currentUser.name,
+      seller_student_id: currentUser.studentId,
+      seller_contact: currentUser.phone || "",
       images: body.images || [],
     };
 

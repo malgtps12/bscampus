@@ -1,56 +1,35 @@
-import { NextRequest, NextResponse } from "next/server"
-import { verifyJWT } from "@/lib/auth-utils"
-import { supabase } from "@/lib/supabase"
+import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/dal";
 
-export const runtime = 'nodejs'
+export const runtime = "nodejs";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const token = request.cookies.get("user_token")?.value
+    const current = await getCurrentUser();
 
-    if (!token) {
-      return NextResponse.json({ user: null }, { status: 401 })
-    }
-
-    const decoded = verifyJWT(token)
-
-    if (!decoded) {
-      return NextResponse.json({ user: null }, { status: 401 })
-    }
-
-    // Pilih semua kolom lalu petakan dengan fallback null - jangan mendaftarkan
-    // kolom opsional secara eksplisit. Jika kolom opsional (rekening bank/dompet
-    // digital) belum ada di database, query ikut gagal dan user yang sudah login
-    // justru dianggap 401 (dulu menyebabkan loop login -> halaman -> login).
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('student_id', decoded.username)
-      .single()
-
-    if (error || !user) {
-      console.error('[Auth Me] User query error:', error?.message)
-      return NextResponse.json({ user: null }, { status: 401 })
+    if (!current) {
+      return NextResponse.json({ user: null }, { status: 401 });
     }
 
     return NextResponse.json({
       user: {
-        id: user.id,
-        name: user.name,
-        studentId: user.student_id,
-        email: user.email,
-        phone: user.phone,
-        campus: user.campus,
-        bankName: user.bank_name ?? null,
-        accountNumber: user.account_number ?? null,
-        accountHolderName: user.account_holder_name ?? null,
-        ewalletType: user.ewallet_type ?? null,
-        ewalletNumber: user.ewallet_number ?? null,
-        createdAt: user.created_at
-      }
-    })
+        id: current.id,
+        authUserId: current.authUserId,
+        name: current.name,
+        studentId: current.studentId,
+        email: current.email,
+        phone: current.phone,
+        campus: current.campus,
+        bankName: current.bankName,
+        accountNumber: current.accountNumber,
+        accountHolderName: current.accountHolderName,
+        ewalletType: current.ewalletType,
+        ewalletNumber: current.ewalletNumber,
+        createdAt: current.createdAt,
+      },
+    });
   } catch (error) {
-    console.error("[Auth Me] Error:", error)
-    return NextResponse.json({ user: null }, { status: 500 })
+    console.error("[Auth Me] Error:", error);
+    return NextResponse.json({ user: null }, { status: 500 });
   }
 }
