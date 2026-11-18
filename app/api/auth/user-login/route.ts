@@ -40,19 +40,53 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await createClient();
+    const normalizedStudentId = studentId.trim();
 
-    const { data: profile, error: profileError } = await supabase
-      .from("users")
-      .select("id, name, student_id, email, phone, campus, auth_user_id")
-      .eq("student_id", studentId)
-      .maybeSingle();
+    type LoginProfile = {
+      id: string;
+      name: string;
+      student_id: string;
+      email: string;
+      phone: string;
+      campus: string;
+      auth_user_id: string | null;
+    };
+
+    let profile: LoginProfile | null = null;
+
+    // RPC SECURITY DEFINER dipakai supaya login tetap bekerja walaupun
+    // publishable key tidak punya akses SELECT langsung ke public.users.
+    const { data: profileData, error: profileError } = await supabase.rpc(
+      "get_user_login_profile",
+      { p_student_id: normalizedStudentId },
+    );
 
     if (profileError) {
-      console.error("[User Login] Query error:", profileError.message);
-      return NextResponse.json(
-        { error: "NIM atau password salah" },
-        { status: 401 },
+      // Fallback untuk deployment yang belum menjalankan migration 009.
+      console.warn(
+        "[User Login] RPC tidak tersedia, pakai query langsung:",
+        profileError.message,
       );
+      const { data: directProfile, error: directError } = await supabase
+        .from("users")
+        .select("id, name, student_id, email, phone, campus, auth_user_id")
+        .eq("student_id", normalizedStudentId)
+        .maybeSingle();
+
+      if (directError) {
+        console.error("[User Login] Query error:", directError.message);
+        return NextResponse.json(
+          { error: "NIM atau password salah" },
+          { status: 401 },
+        );
+      }
+
+      profile = (directProfile as LoginProfile | null) ?? null;
+    } else {
+      profile =
+        profileData && typeof profileData === "object" && !Array.isArray(profileData)
+          ? (profileData as LoginProfile)
+          : null;
     }
 
     // Respons yang sama untuk user tidak ditemukan dan akun belum terhubung,
