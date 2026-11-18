@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
         {
           status: 429,
           headers: {
-            "Retry-After": rateLimitCheck.retryAfter?.toString() || "900",
+            "Retry-After": rateLimitCheck.retryAfter?.toString() || "30",
           },
         },
       );
@@ -56,15 +56,14 @@ export async function POST(request: NextRequest) {
     // case-insensitive, sehingga tidak bergantung pada RLS/GRANT tabel users.
     const result = await createResetCode(targetEmail);
     if (!result.success) {
-      // Email terdaftar tapi RPC gagal -> hampir pasti batas 5 kode/15 menit.
+      // Email terdaftar tapi RPC gagal -> hampir pasti batas 5 kode/30 detik.
       // Beri tahu user supaya tidak menunggu email yang tidak pernah dikirim.
       console.error("[Forgot Password] Failed to create reset code:", result.error);
       return NextResponse.json(
         {
-          error:
-            "Terlalu banyak permintaan kode reset. Coba lagi dalam 15 menit.",
+          error: "Terlalu banyak permintaan kode reset. Coba lagi 30 detik.",
         },
-        { status: 429, headers: { "Retry-After": "900" } },
+        { status: 429, headers: { "Retry-After": "30" } },
       );
     }
 

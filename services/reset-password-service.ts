@@ -8,22 +8,22 @@
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import { supabase } from "@/lib/supabase";
 
-// Rate limiter aplikasi (IP). Database juga membatasi 3 kode / 15 menit / email.
+// Rate limiter aplikasi (IP). Database juga membatasi 5 kode / 30 detik / email.
 const forgotPasswordLimiter = new RateLimiterMemory({
   points: 5,
-  duration: 900,
+  duration: 30,
   keyPrefix: "forgot_password",
 });
 
 const resetPasswordLimiter = new RateLimiterMemory({
   points: 5,
-  duration: 900,
+  duration: 30,
   keyPrefix: "reset_password",
 });
 
 const changePasswordLimiter = new RateLimiterMemory({
   points: 5,
-  duration: 900,
+  duration: 30,
   keyPrefix: "change_password",
 });
 
@@ -74,7 +74,7 @@ export async function createResetCode(
 
     if (typeof data !== "string" || !/^\d{6}$/.test(data)) {
       // RPC mengembalikan NULL jika email tidak terdaftar ATAU batas 5 kode
-      // per 15 menit tercapai. Bedakan di route supaya user tidak terus
+      // per 30 detik tercapai. Bedakan di route supaya user tidak terus
       // menunggu email yang sebenarnya tidak pernah dikirim.
       return {
         code: "",
@@ -106,7 +106,7 @@ async function checkRateLimit(
     const retryAfterMs = (rejected as { msBeforeNext?: number }).msBeforeNext;
     return {
       allowed: false,
-      retryAfter: Math.ceil((retryAfterMs ?? 900_000) / 1000),
+      retryAfter: Math.ceil((retryAfterMs ?? 30_000) / 1000),
     };
   }
 }

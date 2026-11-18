@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
         {
           status: 429,
           headers: {
-            "Retry-After": rateLimitCheck.retryAfter?.toString() || "900",
+            "Retry-After": rateLimitCheck.retryAfter?.toString() || "30",
           },
         },
       );

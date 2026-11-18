@@ -50,13 +50,13 @@ BEGIN
     RETURN NULL;
   END IF;
 
-  -- Maksimal 5 kode per email dalam 15 menit, sama dengan rate limiter
+  -- Maksimal 5 kode per email dalam 30 detik, sama dengan rate limiter
   -- aplikasi per IP. Termasuk panggilan langsung ke RPC.
 
   SELECT count(*) INTO v_recent
   FROM public.password_reset_codes
   WHERE lower(email) = v_email
-    AND created_at > now() - interval '15 minutes';
+    AND created_at > now() - interval '30 seconds';
 
   IF v_recent >= 5 THEN
     RETURN NULL;
