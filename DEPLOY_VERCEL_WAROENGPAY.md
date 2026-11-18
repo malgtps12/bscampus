@@ -36,8 +36,8 @@ Di halaman import, buka **Environment Variables**. Isi semua nilai berikut
 | `ADMIN_USERNAME` | username admin |
 | `ADMIN_PASSWORD` | password admin |
 | `JWT_SECRET` | string acak ≥32 karakter |
-| `RESEND_API_KEY` | key Resend |
-| `RESEND_FROM_EMAIL` | `onboarding@resend.dev` |
+| `BREVO_API_KEY` | API key Brevo (`xkeysib-...`) |
+| `BREVO_FROM_EMAIL` | sender terverifikasi, mis. `BSCampus <no-reply@domain-anda.com>` |
 | `WAROENGPAY_API_KEY` | `wp_live_...` (produksi) |
 | `WAROENGPAY_WEBHOOK_SECRET` | `whsec_live_...` |
 

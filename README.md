@@ -46,7 +46,7 @@ Sebelum first run:
    lalu `migrations/007_password_reset_rpc.sql` di Supabase SQL Editor.
 2. Aktifkan Email provider di Supabase Authentication.
 3. Daftarkan redirect URL: `${NEXT_PUBLIC_APP_URL}/auth/callback`.
-4. Isi `RESEND_API_KEY` dan `RESEND_FROM_EMAIL` untuk kirim kode reset.
+4. Isi `BREVO_API_KEY` dan `BREVO_FROM_EMAIL` untuk kirim kode reset.
 5. Password lama tetap dipakai bila hash bcrypt-nya valid; hanya akun dengan
    hash rusak/null yang perlu **Lupa password**.
 6. Di `/profile`, user bisa ganti password dengan memasukkan password lama,

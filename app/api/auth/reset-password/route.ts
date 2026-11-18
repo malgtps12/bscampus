@@ -11,7 +11,7 @@ import { checkResetPasswordRateLimit } from "@/services/reset-password-service";
 export const runtime = "nodejs";
 
 /**
- * Reset password dengan kode 6 digit dari email (Resend).
+ * Reset password dengan kode 6 digit dari email (Brevo).
  * Tidak memerlukan session Supabase Auth, jadi tetap bekerja saat user
  * belum bisa login.
  */

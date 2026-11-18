@@ -33,7 +33,7 @@ memanggil fungsi tersebut, bukan lagi `verifyJWT(cookie user_token)`.
 | --- | --- |
 | `POST /api/auth/user-login` | Terima NIM, cari email, panggil `supabase.auth.signInWithPassword`. Tidak lagi membandingkan bcrypt. |
 | `POST /api/auth/register` | `supabase.auth.signUp` dengan metadata `name`, `student_id`, `phone`, `campus`. Baris `users` dibuat trigger DB. |
-| `POST /api/auth/forgot-password` | Buat kode 6 digit via RPC `create_password_reset_code`, kirim via Resend. Tidak memakai email Supabase Auth. |
+| `POST /api/auth/forgot-password` | Buat kode 6 digit via RPC `create_password_reset_code`, kirim via Brevo. Tidak memakai email Supabase Auth. |
 | `POST /api/auth/reset-password` | Panggil RPC `reset_password_with_code` untuk verifikasi kode + update `auth.users` tanpa service role key. |
 | `POST /api/auth/change-password` | Baru. User login mengirim password lama, password baru, konfirmasi; verifikasi via `signInWithPassword` lalu `auth.updateUser`. |
 | `GET /auth/callback` | Tukar `code` menjadi session cookie (tetap dipakai verifikasi email registrasi). |
@@ -66,7 +66,7 @@ baru.
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
    - `NEXT_PUBLIC_APP_URL`
    - `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `JWT_SECRET`
-   - `WAROENGPAY_API_KEY`, `WAROENGPAY_WEBHOOK_SECRET`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`
+   - `WAROENGPAY_API_KEY`, `WAROENGPAY_WEBHOOK_SECRET`, `BREVO_API_KEY`, `BREVO_FROM_EMAIL`
 8. Deploy, lalu uji registrasi user baru dan login.
 9. Uji login salah satu user lama dengan password lamanya.
 
@@ -97,7 +97,7 @@ kebenaran login adalah `auth.users.encrypted_password`.
 - `POST /api/auth/forgot-password` memanggil RPC `create_password_reset_code`.
   Kode 6 digit dibuat di database dengan `gen_random_bytes`, di-hash dengan
   bcrypt (`pgcrypto`), lalu dikembalikan sekali ke aplikasi untuk dikirim via
-  Resend. Kode berlaku 10 menit dan maksimal 5 kali salah.
+  Brevo. Kode berlaku 10 menit dan maksimal 5 kali salah.
 - Tabel `password_reset_codes` sudah dienkripsi RLS dan akses langsungnya
   dicabut dari `anon`/`authenticated`. Klien hanya bisa memanggil RPC yang
   sudah dibatasi (maksimal 5 kode per email per 15 menit).
@@ -106,7 +106,7 @@ kebenaran login adalah `auth.users.encrypted_password`.
   menyinkronkan `users.password_hash`, lalu menandai kode `used = TRUE`.
 - Semua error kode sengaja seragam: `Kode tidak valid atau sudah kadaluarsa.
   Minta kode baru.` supaya tidak membocorkan keberadaan email.
-- `RESEND_API_KEY` wajib diisi. Tanpa itu endpoint forgot-password mengembalikan
+- `BREVO_API_KEY` wajib diisi. Tanpa itu endpoint forgot-password mengembalikan
   error 500 dan kode tidak dikirim.
 - Ganti password dari `/profile` memakai `POST /api/auth/change-password`:
   password lama diverifikasi `signInWithPassword`, password baru disimpan

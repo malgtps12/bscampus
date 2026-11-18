@@ -31,7 +31,7 @@ type ServiceResult<T> = T & { success: boolean; error?: string };
 
 /**
  * Minta kode 6 digit baru. RPC mengembalikan kode plaintext hanya sekali;
- * aplikasi lalu mengirimnya lewat Resend. Mengembalikan success=false bila
+ * aplikasi lalu mengirimnya lewat Brevo. Mengembalikan success=false bila
  * email tidak terdaftar atau rate limit database tercapai.
  */
 export async function createResetCode(

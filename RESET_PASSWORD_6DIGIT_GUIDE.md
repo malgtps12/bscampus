@@ -1,7 +1,7 @@
-# Reset Password 6 Digit (Supabase RPC + Resend)
+# Reset Password 6 Digit (Supabase RPC + Brevo)
 
 Alur lupa password tidak bergantung pada email Supabase Auth. Aplikasi
-membuat kode 6 digit lewat RPC, mengirimnya dengan Resend, lalu memverifikasi
+membuat kode 6 digit lewat RPC, mengirimnya dengan Brevo, lalu memverifikasi
 kode di database. Tidak ada `SUPABASE_SERVICE_ROLE_KEY` yang dipakai.
 
 ## Migration yang wajib dijalankan
@@ -17,11 +17,11 @@ Jalankan keduanya di Supabase SQL Editor sebelum deploy.
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your-project-url
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxxxx
-RESEND_API_KEY=re_xxxxxxxx
-RESEND_FROM_EMAIL=BSCampus <onboarding@resend.dev>
+BREVO_API_KEY=xkeysib-xxxxxxxx
+BREVO_FROM_EMAIL=BSCampus <no-reply@domain-anda.com>
 ```
 
-`RESEND_API_KEY` wajib. Tanpa itu, `POST /api/auth/forgot-password` mengembalikan
+`BREVO_API_KEY` wajib. Tanpa itu, `POST /api/auth/forgot-password` mengembalikan
 error 500 dan kode tidak dikirim.
 
 ## Alur UI
@@ -123,6 +123,6 @@ dengan `signInWithPassword`, lalu password baru disimpan dengan
 
 1. `npm run dev`.
 2. Buka `http://localhost:3000/forgot-password`.
-3. Masukkan email terdaftar, cek inbox Resend untuk kode 6 digit.
+3. Masukkan email terdaftar, cek inbox Brevo untuk kode 6 digit.
 4. Masukkan kode + password baru + konfirmasi, lalu login dengan password baru.
 5. Login, buka `/profile`, coba Ubah Password dengan password lama/baru/konfirmasi.
