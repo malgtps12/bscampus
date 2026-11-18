@@ -11,8 +11,8 @@ export interface AuthPayload {
 const JWT_EXPIRES_IN = '24h'
 const DEV_JWT_SECRET = 'bscampus-dev-only-secret-do-not-use-in-production'
 
-const RATE_LIMIT_WINDOW = 15 * 60 * 1000
-const MAX_ATTEMPTS = 5
+const LOGIN_RATE_LIMIT_WINDOW = 30 * 1000
+const MAX_FAILED_LOGINS = 5
 const REGISTER_RATE_LIMIT_WINDOW = 60 * 60 * 1000
 const MAX_REGISTER_ATTEMPTS = 10
 
@@ -113,7 +113,7 @@ export function validatePasswordLength(input: unknown): input is string {
 function pruneExpired(map: Map<string, AttemptRecord>, now: number): void {
   if (map.size === 0) return
   for (const [key, record] of map) {
-    if (now > record.resetTime) map.delete(key)
+    if (now >= record.resetTime) map.delete(key)
   }
 }
 
@@ -141,12 +141,53 @@ function consumeAttempt(
   return true
 }
 
+function isLoginLocked(map: Map<string, AttemptRecord>, key: string): boolean {
+  const now = Date.now()
+  pruneExpired(map, now)
+  const attempt = map.get(key)
+  return Boolean(
+    attempt && attempt.count >= MAX_FAILED_LOGINS && now < attempt.resetTime
+  )
+}
+
+function recordFailure(map: Map<string, AttemptRecord>, key: string): void {
+  const now = Date.now()
+  pruneExpired(map, now)
+
+  const attempt = map.get(key)
+  if (!attempt || now >= attempt.resetTime) {
+    map.set(key, { count: 1, resetTime: now + LOGIN_RATE_LIMIT_WINDOW })
+    return
+  }
+
+  attempt.count++
+}
+
+/** Cek apakah IP sedang terkunci. Tidak menambah jumlah percobaan. */
 export function checkRateLimit(ip: string): boolean {
-  return consumeAttempt(loginAttempts, ip, RATE_LIMIT_WINDOW, MAX_ATTEMPTS)
+  return !isLoginLocked(loginAttempts, ip)
 }
 
 export function checkAdminRateLimit(ip: string): boolean {
-  return consumeAttempt(adminLoginAttempts, ip, RATE_LIMIT_WINDOW, MAX_ATTEMPTS)
+  return !isLoginLocked(adminLoginAttempts, ip)
+}
+
+/** Panggil hanya saat kredensial login gagal. */
+export function recordFailedLogin(ip: string): void {
+  recordFailure(loginAttempts, ip)
+}
+
+export function recordFailedAdminLogin(ip: string): void {
+  recordFailure(adminLoginAttempts, ip)
+}
+
+/** Panggil saat login berhasil supaya hitungan gagal dihapus. */
+export function clearLoginFailures(ip: string): void {
+  loginAttempts.delete(ip)
+}
+
+export function clearAdminLoginFailures(ip: string): void {
+  adminLoginAttempts.delete(ip)
 }
 
 export function checkRegisterRateLimit(ip: string): boolean {

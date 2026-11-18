@@ -1,4 +1,10 @@
-import { validateInput, checkRateLimit, checkRegisterRateLimit } from '@/lib/auth-utils'
+import {
+  validateInput,
+  checkRateLimit,
+  recordFailedLogin,
+  clearLoginFailures,
+  checkRegisterRateLimit,
+} from '@/lib/auth-utils'
 
 describe('Auth Utils', () => {
   describe('validateInput', () => {
@@ -24,17 +30,51 @@ describe('Auth Utils', () => {
   })
 
   describe('checkRateLimit', () => {
-    it('should allow first attempt', () => {
+    it('should allow first attempt and not consume on status checks', () => {
       const ip = '192.168.1.1'
+      clearLoginFailures(ip)
+      expect(checkRateLimit(ip)).toBe(true)
       expect(checkRateLimit(ip)).toBe(true)
     })
 
-    it('should block after max attempts', () => {
+    it('should block after 5 failed logins', () => {
       const ip = '192.168.1.2'
+      clearLoginFailures(ip)
+      for (let i = 0; i < 4; i++) {
+        recordFailedLogin(ip)
+        expect(checkRateLimit(ip)).toBe(true)
+      }
+      recordFailedLogin(ip)
+      expect(checkRateLimit(ip)).toBe(false)
+    })
+
+    it('should unlock 30 seconds after the first failed login', () => {
+      const ip = '192.168.1.5'
+      jest.useFakeTimers()
+      try {
+        clearLoginFailures(ip)
+        for (let i = 0; i < 5; i++) {
+          recordFailedLogin(ip)
+        }
+        expect(checkRateLimit(ip)).toBe(false)
+
+        jest.advanceTimersByTime(30_000)
+        expect(checkRateLimit(ip)).toBe(true)
+      } finally {
+        jest.useRealTimers()
+      }
+    })
+
+    it('should clear failures after a successful login', () => {
+      const ip = '192.168.1.6'
+      clearLoginFailures(ip)
       for (let i = 0; i < 5; i++) {
-        checkRateLimit(ip)
+        recordFailedLogin(ip)
       }
       expect(checkRateLimit(ip)).toBe(false)
+
+      clearLoginFailures(ip)
+      expect(checkRateLimit(ip)).toBe(true)
     })
   })
 

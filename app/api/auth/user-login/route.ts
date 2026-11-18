@@ -4,6 +4,8 @@ import {
   validateInput,
   validatePasswordLength,
   checkRateLimit,
+  recordFailedLogin,
+  clearLoginFailures,
   getClientIp,
 } from "@/lib/auth-utils";
 
@@ -20,8 +22,8 @@ export async function POST(request: NextRequest) {
 
     if (!checkRateLimit(ip)) {
       return NextResponse.json(
-        { error: "Terlalu banyak percobaan login. Coba lagi nanti." },
-        { status: 429 },
+        { error: "Terlalu banyak percobaan login. Coba lagi 30 detik." },
+        { status: 429, headers: { "Retry-After": "30" } },
       );
     }
 
@@ -92,6 +94,7 @@ export async function POST(request: NextRequest) {
     // Respons yang sama untuk user tidak ditemukan dan akun belum terhubung,
     // kecuali untuk akun lama yang memang harus reset password.
     if (!profile?.email) {
+      recordFailedLogin(ip);
       return NextResponse.json(
         { error: "NIM atau password salah" },
         { status: 401 },
@@ -99,6 +102,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!profile.auth_user_id) {
+      recordFailedLogin(ip);
       return NextResponse.json(
         {
           error:
@@ -115,6 +119,8 @@ export async function POST(request: NextRequest) {
 
     if (error || !data.user) {
       const message = error?.message || "";
+      recordFailedLogin(ip);
+
       if (/email not confirmed/i.test(message)) {
         return NextResponse.json(
           { error: "Email belum diverifikasi. Silakan cek email Anda." },
@@ -127,6 +133,8 @@ export async function POST(request: NextRequest) {
         { status: 401 },
       );
     }
+
+    clearLoginFailures(ip);
 
     const response = NextResponse.json(
       {

@@ -4,6 +4,8 @@ import {
   validateInput,
   validatePasswordLength,
   checkAdminRateLimit,
+  recordFailedAdminLogin,
+  clearAdminLoginFailures,
   generateJWT,
   getClientIp,
 } from "@/lib/auth-utils"
@@ -39,8 +41,8 @@ export async function POST(request: NextRequest) {
     if (!checkAdminRateLimit(ip)) {
       console.warn(`[Security] Rate limit admin login exceeded for IP: ${ip}`)
       return NextResponse.json(
-        { error: "Terlalu banyak percobaan login. Coba lagi nanti." },
-        { status: 429 }
+        { error: "Terlalu banyak percobaan login. Coba lagi 30 detik." },
+        { status: 429, headers: { "Retry-After": "30" } }
       )
     }
 
@@ -66,12 +68,15 @@ export async function POST(request: NextRequest) {
     const passwordMatches = safeEqual(password, ADMIN_PASSWORD)
 
     if (!usernameMatches || !passwordMatches) {
+      recordFailedAdminLogin(ip)
       console.warn(`[Security] Failed admin login attempt from IP: ${ip}`)
       return NextResponse.json(
         { error: "Username atau password salah" },
         { status: 401 }
       )
     }
+
+    clearAdminLoginFailures(ip)
 
     const token = generateJWT(ADMIN_USERNAME, "admin")
 
