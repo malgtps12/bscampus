@@ -19,7 +19,7 @@ function genericResponse() {
 }
 
 /**
- * Kirim kode 6 digit via Brevo (bukan email Supabase Auth).
+ * Kirim kode 6 digit via Resend (bukan email Supabase Auth).
  * Kode dibuat dan disimpan ter-hash di password_reset_codes.
  */
 export async function POST(request: NextRequest) {
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       // Jangan log kode reset - cukup catat bahwa pengiriman gagal.
       console.error(`[Forgot Password] Email sending failed for: ${targetEmail}`);
       return NextResponse.json(
-        { error: "Gagal mengirim email. Periksa konfigurasi BREVO_API_KEY." },
+        { error: "Gagal mengirim email. Periksa konfigurasi RESEND_API_KEY." },
         { status: 500 },
       );
     }

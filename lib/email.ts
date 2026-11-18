@@ -1,72 +1,41 @@
-/**
- * Pengirim email transaksional memakai Brevo REST API.
- * Tidak ada SDK tambahan: cukup fetch ke /v3/smtp/email.
- *
- * Environment:
- * - BREVO_API_KEY  (wajib)
- * - BREVO_FROM_EMAIL (opsional, format "Nama <email>" atau email saja)
- */
+import { Resend } from 'resend'
 
 export interface EmailOptions {
-  to: string;
-  subject: string;
-  text: string;
-  html?: string;
-}
-
-const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
-
-function getSender(): { name: string; email: string } {
-  const raw = (process.env.BREVO_FROM_EMAIL || "BSCampus <no-reply@bscampus.com>").trim();
-  const match = raw.match(/^(.*?)\s*<([^>]+)>$/);
-
-  if (match) {
-    return {
-      name: match[1].trim() || "BSCampus",
-      email: match[2].trim(),
-    };
-  }
-
-  return { name: "BSCampus", email: raw };
+  to: string
+  subject: string
+  text: string
+  html?: string
 }
 
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
-    const apiKey = process.env.BREVO_API_KEY;
+    const apiKey = process.env.RESEND_API_KEY
     if (!apiKey) {
-      // Jangan log isi email (bisa berisi kode reset) dan jangan berpura-pura sukses.
-      console.error("[Brevo] BREVO_API_KEY belum dikonfigurasi - email tidak terkirim");
-      return false;
+      // Jangan log isi email (bisa berisi kode reset) dan jangan berpura-pura sukses
+      console.error('[Resend] RESEND_API_KEY belum dikonfigurasi - email tidak terkirim')
+      return false
     }
 
-    const response = await fetch(BREVO_API_URL, {
-      method: "POST",
-      headers: {
-        "api-key": apiKey,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        sender: getSender(),
-        to: [{ email: options.to }],
-        subject: options.subject,
-        textContent: options.text,
-        htmlContent: options.html || options.text.replace(/\n/g, "<br/>"),
-      }),
-    });
+    const resend = new Resend(apiKey)
 
-    if (!response.ok) {
-      // Jangan log body respons karena bisa memuat detail akun/email.
-      console.error(`[Brevo] Gagal mengirim email (status ${response.status})`);
-      return false;
+    const result = await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || 'no-reply@bscampus.com',
+      to: options.to,
+      subject: options.subject,
+      text: options.text,
+      html: options.html || options.text.replace(/\n/g, '<br/>')
+    })
+
+    if (result.error) {
+      console.error('[Resend Email] Error:', result.error)
+      return false
     }
 
-    const result = (await response.json().catch(() => ({}))) as { messageId?: string };
-    console.log("[Brevo] Email terkirim:", result.messageId ?? "tanpa messageId");
-    return true;
+    console.log('[Resend Email] Sent successfully:', result.data?.id)
+    return true
   } catch (error) {
-    console.error("[Brevo] Error:", error);
-    return false;
+    console.error('[Resend Email] Error:', error)
+    return false
   }
 }
 
@@ -123,7 +92,7 @@ export async function sendResetCodeEmail(
   </div>
 </body>
 </html>
-`;
+`
 
   const text = `Kode Reset Password BSCampus
 
@@ -135,12 +104,12 @@ Jika Anda tidak meminta reset password, abaikan email ini.
 
 ---
 Tim BSCampus
-Marketplace Mahasiswa Politeknik Negeri Lhokseumawe`;
+Marketplace Mahasiswa Politeknik Negeri Lhokseumawe`
 
   return await sendEmail({
     to: email,
-    subject: "Kode Reset Password - BSCampus",
-    text,
-    html,
-  });
+    subject: 'Kode Reset Password - BSCampus',
+    text: text,
+    html: html
+  })
 }
