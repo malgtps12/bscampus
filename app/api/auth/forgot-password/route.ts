@@ -6,7 +6,6 @@ import {
 } from "@/services/reset-password-service";
 import { sendResetCodeEmail } from "@/lib/email";
 import { getClientIp } from "@/lib/auth-utils";
-import { supabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
@@ -49,19 +48,8 @@ export async function POST(request: NextRequest) {
     const targetEmail = email.trim();
     if (!validateEmail(targetEmail)) return genericResponse();
 
-    // Pastikan email benar-benar terdaftar, tanpa membocorkan hasilnya.
-    const { data: user, error } = await supabase
-      .from("users")
-      .select("id")
-      .eq("email", targetEmail)
-      .maybeSingle();
-
-    if (error) {
-      console.error("[Forgot Password] User lookup error:", error.message);
-    }
-
-    if (!user) return genericResponse();
-
+    // RPC memakai SECURITY DEFINER dan sudah mengecek email secara
+    // case-insensitive, sehingga tidak bergantung pada RLS/GRANT tabel users.
     const result = await createResetCode(targetEmail);
     if (!result.success) {
       // Bisa berarti email tidak terdaftar atau rate limit database tercapai.
